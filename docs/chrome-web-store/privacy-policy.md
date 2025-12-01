@@ -76,7 +76,7 @@ If we make changes to this privacy policy, we will update the "Last Updated" dat
 
 ## Contact
 
-If you have questions about this privacy policy or the extension's data practices, please contact us through the Chrome Web Store support page or via the support email provided in the extension listing.
+If you have questions about this privacy policy or the extension's data practices, please contact us at vship@duck.com or through the Chrome Web Store support page.
 
 ## Compliance
 
