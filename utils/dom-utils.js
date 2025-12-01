@@ -1,5 +1,5 @@
 /**
- * Shared DOM manipulation utilities for Social Media Redirector
+ * Shared DOM manipulation utilities for Embed Link Helper
  * Requirements: 5.1, 5.2, 5.3
  */
 

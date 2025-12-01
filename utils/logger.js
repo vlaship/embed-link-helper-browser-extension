@@ -1,5 +1,5 @@
 /**
- * Error logging utilities for Social Media Redirector
+ * Error logging utilities for Embed Link Helper
  * Provides consistent logging across the extension
  */
 

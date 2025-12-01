@@ -8,6 +8,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
 
 console.log('Building Chrome extension package...\n');
 
@@ -125,15 +126,42 @@ try {
   console.log('\n✓ Chrome extension built successfully!');
   console.log(`Version: ${newVersion}`);
   console.log(`\nOutput directory: ${path.resolve(distDir)}`);
+  
+  // Create zip file
+  console.log('\nCreating distribution package...');
+  const zipFileName = 'embed-link-helper-chrome.zip';
+  const zipPath = path.resolve(zipFileName);
+  
+  // Remove existing zip if present
+  if (fs.existsSync(zipPath)) {
+    fs.unlinkSync(zipPath);
+  }
+  
+  try {
+    // Change to dist directory and create zip
+    const originalDir = process.cwd();
+    process.chdir(distDir);
+    
+    // Use PowerShell with full path
+    const command = `powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Compress-Archive -Path * -DestinationPath '${path.join(originalDir, zipFileName)}' -Force"`;
+    execSync(command);
+    
+    process.chdir(originalDir);
+    console.log(`✓ Created ${zipFileName}`);
+    console.log(`\nPackage ready for upload: ${zipPath}`);
+  } catch (zipError) {
+    console.log(`⚠ Could not create zip automatically: ${zipError.message}`);
+    console.log('\nTo create a .zip file manually:');
+    console.log(`  cd ${distDir}`);
+    console.log('  Compress-Archive -Path * -DestinationPath ../embed-link-helper-chrome.zip');
+  }
+  
   console.log('\nTo load in Chrome:');
   console.log('1. Open Chrome');
   console.log('2. Go to chrome://extensions/');
   console.log('3. Enable "Developer mode"');
   console.log('4. Click "Load unpacked"');
   console.log(`5. Select the ${distDir}/ directory`);
-  console.log('\nTo create a .zip file for Chrome Web Store:');
-  console.log(`  cd ${distDir}`);
-  console.log('  zip -r ../social-media-redirector-chrome.zip *');
 
 } catch (error) {
   console.error('✗ Error building Chrome extension:', error.message);

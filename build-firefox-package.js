@@ -8,6 +8,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
 
 console.log('Building Firefox extension package...\n');
 
@@ -125,14 +126,41 @@ try {
   console.log('\n✓ Firefox extension built successfully!');
   console.log(`Version: ${newVersion}`);
   console.log(`\nOutput directory: ${path.resolve(distDir)}`);
+  
+  // Create zip file
+  console.log('\nCreating distribution package...');
+  const zipFileName = 'embed-link-helper-firefox.zip';
+  const zipPath = path.resolve(zipFileName);
+  
+  // Remove existing zip if present
+  if (fs.existsSync(zipPath)) {
+    fs.unlinkSync(zipPath);
+  }
+  
+  try {
+    // Change to dist directory and create zip
+    const originalDir = process.cwd();
+    process.chdir(distDir);
+    
+    // Use PowerShell with full path
+    const command = `powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Compress-Archive -Path * -DestinationPath '${path.join(originalDir, zipFileName)}' -Force"`;
+    execSync(command);
+    
+    process.chdir(originalDir);
+    console.log(`✓ Created ${zipFileName}`);
+    console.log(`\nPackage ready for upload: ${zipPath}`);
+  } catch (zipError) {
+    console.log(`⚠ Could not create zip automatically: ${zipError.message}`);
+    console.log('\nTo create a .zip file manually:');
+    console.log(`  cd ${distDir}`);
+    console.log('  Compress-Archive -Path * -DestinationPath ../embed-link-helper-firefox.zip');
+  }
+  
   console.log('\nTo load in Firefox:');
   console.log('1. Open Firefox');
   console.log('2. Go to about:debugging#/runtime/this-firefox');
   console.log('3. Click "Load Temporary Add-on"');
   console.log(`4. Select manifest.json from ${distDir}/`);
-  console.log('\nTo create a .zip file for distribution:');
-  console.log(`  cd ${distDir}`);
-  console.log('  zip -r ../social-media-redirector-firefox.zip *');
 
 } catch (error) {
   console.error('✗ Error building Firefox extension:', error.message);

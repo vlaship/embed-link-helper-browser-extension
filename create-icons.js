@@ -14,7 +14,7 @@ const createSVGIcon = (size) => {
   <rect width="${size}" height="${size}" fill="#4A90E2"/>
   <text x="50%" y="50%" font-family="Arial, sans-serif" font-size="${size * 0.4}" 
         fill="white" text-anchor="middle" dominant-baseline="middle" font-weight="bold">
-    SMR
+    ELH
   </text>
 </svg>`;
 };
