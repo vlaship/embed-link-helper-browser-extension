@@ -1,0 +1,36 @@
+{
+  "name": "social-media-redirector",
+  "version": "1.0.9",
+  "description": "Browser extension that adds redirect buttons to Twitter/X and Instagram pages",
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "switch:firefox": "node switch-to-firefox.js",
+    "switch:chrome": "node switch-to-chrome.js",
+    "build:firefox": "node build-firefox-package.js",
+    "build:chrome": "node build-chrome-package.js",
+    "build:all": "npm run build:firefox && npm run build:chrome",
+    "update-polyfill": "copy node_modules\\webextension-polyfill\\dist\\browser-polyfill.min.js lib\\browser-polyfill.js"
+  },
+  "devDependencies": {
+    "fast-check": "^3.15.0",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0"
+  },
+  "jest": {
+    "testEnvironment": "jsdom",
+    "testMatch": [
+      "**/__tests__/**/*.test.js",
+      "**/*.test.js"
+    ],
+    "collectCoverageFrom": [
+      "**/*.js",
+      "!**/node_modules/**",
+      "!**/*.test.js"
+    ]
+  },
+  "dependencies": {
+    "sharp": "^0.34.5",
+    "webextension-polyfill": "^0.12.0"
+  }
+}
