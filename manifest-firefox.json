@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Embed Link Helper",
-  "version": "1.0.3",
+  "version": "1.0.2",
   "description": "Adds redirect buttons to Twitter/X and Instagram pages for quick access to alternative hostnames",
   "permissions": [
     "storage",
