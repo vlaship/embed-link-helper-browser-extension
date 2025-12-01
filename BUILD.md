@@ -78,19 +78,15 @@ Upload `social-media-redirector-chrome.zip` to https://chrome.google.com/webstor
 
 ## Development Workflow
 
-For active development, you can work directly in the main directory:
-
-### Switch Between Browsers
+For active development, rebuild the appropriate package after making changes:
 
 ```bash
-# For Firefox development
-npm run switch:firefox
+# Rebuild Firefox package
+npm run build:firefox
 
-# For Chrome development
-npm run switch:chrome
+# Rebuild Chrome package
+npm run build:chrome
 ```
-
-This modifies `manifest.json` in the main directory.
 
 ### Reload After Changes
 

@@ -36,25 +36,25 @@ A cross-browser extension (Chrome and Firefox) that transforms Twitter/X and Ins
 ## Installation
 
 ### Chrome
-1. **Switch to Chrome version** (if not already):
+1. **Build Chrome package**:
    ```bash
-   node switch-to-chrome.js
+   npm run build:chrome
    ```
 2. Open Chrome and navigate to `chrome://extensions/`
 3. Enable "Developer mode" in the top right
 4. Click "Load unpacked"
-5. Select the extension directory
+5. Select the `dist-chrome` directory
 
 ### Firefox
-1. **Switch to Firefox version** (if not already):
+1. **Build Firefox package**:
    ```bash
-   node switch-to-firefox.js
+   npm run build:firefox
    ```
 2. Open Firefox and navigate to `about:debugging#/runtime/this-firefox`
 3. Click "Load Temporary Add-on"
-4. Select the `manifest.json` file from the extension directory
+4. Select the `manifest.json` file from the `dist-firefox` directory
 
-**Note**: Chrome requires Manifest V3, while Firefox uses Manifest V2. Use the switch scripts to toggle between versions.
+**Note**: Chrome uses Manifest V3, while Firefox uses Manifest V2. The build scripts automatically create the correct version for each browser.
 
 ## Configuration
 
@@ -139,18 +139,6 @@ npm run build:all
 ```
 
 The build scripts create clean packages ready for distribution or loading in the browser.
-
-#### Switch Manifest (Development)
-
-For development in the main directory:
-
-```bash
-# Switch to Firefox (Manifest V2)
-npm run switch:firefox
-
-# Switch to Chrome (Manifest V3)
-npm run switch:chrome
-```
 
 ### Technology Stack
 - Manifest V3 (Chrome) / V2 (Firefox)
