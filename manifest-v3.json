@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "Social Media Redirector",
-  "version": "1.0.9",
+  "name": "Embed Link Helper",
+  "version": "1.0.0",
   "description": "Adds redirect buttons to Twitter/X and Instagram pages for quick access to alternative hostnames",
   "permissions": [
     "storage",
@@ -29,28 +29,40 @@
         "*://x.com/*"
       ],
       "js": [
+        "utils/logger.js",
+        "utils/dom-utils.js",
         "utils/post-detector.js",
         "utils/post-url-extractor.js",
+        "utils/url-transformer.js",
         "utils/per-post-button.js",
         "utils/button-injector.js",
         "utils/post-registry.js",
         "content/twitter-content.js"
       ],
-      "run_at": "document_end"
+      "css": [
+        "utils/button-styles.css"
+      ],
+      "run_at": "document_idle"
     },
     {
       "matches": [
         "*://www.instagram.com/*"
       ],
       "js": [
+        "utils/logger.js",
+        "utils/dom-utils.js",
         "utils/post-detector.js",
         "utils/post-url-extractor.js",
+        "utils/url-transformer.js",
         "utils/per-post-button.js",
         "utils/button-injector.js",
         "utils/post-registry.js",
         "content/instagram-content.js"
       ],
-      "run_at": "document_end"
+      "css": [
+        "utils/button-styles.css"
+      ],
+      "run_at": "document_idle"
     }
   ],
   "icons": {

@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Social Media Redirector",
+  "name": "Embed Link Helper",
   "version": "1.0.0",
   "description": "Adds redirect buttons to Twitter/X and Instagram pages for quick access to alternative hostnames",
   "permissions": [
@@ -42,7 +42,7 @@
   },
   "browser_specific_settings": {
     "gecko": {
-      "id": "social-media-redirector@example.com",
+      "id": "embed-link-helper@example.com",
       "strict_min_version": "109.0"
     }
   }

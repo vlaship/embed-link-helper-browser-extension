@@ -1,4 +1,4 @@
-// Background script for Social Media Redirector extension
+// Background script for Embed Link Helper extension
 // Manages extension lifecycle, storage operations, and message passing
 
 // For Chrome MV3 service workers, we need to import the polyfill
@@ -11,7 +11,7 @@ if (typeof importScripts === 'function') {
   }
 }
 
-console.log('Social Media Redirector background script loaded');
+console.log('Embed Link Helper background script loaded');
 
 // Default configuration values
 const DEFAULT_CONFIG = {

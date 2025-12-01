@@ -10,14 +10,14 @@ const path = require('path');
 
 // Create simple PNG icons using data URLs
 const createPNGIcon = (size) => {
-  // Create a simple blue square with "SMR" text as base64 PNG
+  // Create a simple blue square with "ELH" text as base64 PNG
   // This is a minimal PNG that Chrome will accept
   const canvas = `
     <svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
       <rect width="${size}" height="${size}" fill="#4A90E2"/>
       <text x="50%" y="50%" font-family="Arial, sans-serif" font-size="${size * 0.4}" 
             fill="white" text-anchor="middle" dominant-baseline="middle" font-weight="bold">
-        SMR
+        ELH
       </text>
     </svg>
   `;

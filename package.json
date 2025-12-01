@@ -1,6 +1,6 @@
 {
-  "name": "social-media-redirector",
-  "version": "1.0.9",
+  "name": "embed-link-helper-browser-extension",
+  "version": "1.0.0",
   "description": "Browser extension that adds redirect buttons to Twitter/X and Instagram pages",
   "scripts": {
     "test": "jest",

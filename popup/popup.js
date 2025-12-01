@@ -1,4 +1,4 @@
-// Popup script for Social Media Redirector extension
+// Popup script for Embed Link Helper extension
 // Handles configuration UI and user interactions
 // Note: browser-polyfill.js is loaded before this script in popup.html
 

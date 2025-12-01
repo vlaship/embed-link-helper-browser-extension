@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
-  "name": "Social Media Redirector",
-  "version": "1.0.9",
+  "name": "Embed Link Helper",
+  "version": "1.0.0",
   "description": "Adds redirect buttons to Twitter/X and Instagram pages for quick access to alternative hostnames",
   "permissions": [
     "storage",
@@ -30,7 +30,18 @@
       ],
       "js": [
         "lib/browser-polyfill.js",
+        "utils/logger.js",
+        "utils/dom-utils.js",
+        "utils/post-detector.js",
+        "utils/post-url-extractor.js",
+        "utils/url-transformer.js",
+        "utils/per-post-button.js",
+        "utils/button-injector.js",
+        "utils/post-registry.js",
         "content/twitter-content.js"
+      ],
+      "css": [
+        "utils/button-styles.css"
       ],
       "run_at": "document_idle"
     },
@@ -40,7 +51,18 @@
       ],
       "js": [
         "lib/browser-polyfill.js",
+        "utils/logger.js",
+        "utils/dom-utils.js",
+        "utils/post-detector.js",
+        "utils/post-url-extractor.js",
+        "utils/url-transformer.js",
+        "utils/per-post-button.js",
+        "utils/button-injector.js",
+        "utils/post-registry.js",
         "content/instagram-content.js"
+      ],
+      "css": [
+        "utils/button-styles.css"
       ],
       "run_at": "document_idle"
     }
@@ -52,7 +74,7 @@
   },
   "browser_specific_settings": {
     "gecko": {
-      "id": "social-media-redirector@example.com",
+      "id": "embed-link-helper@example.com",
       "strict_min_version": "57.0"
     }
   }
