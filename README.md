@@ -1,6 +1,6 @@
 # Social Media Link Transformer Browser Extension
 
-A cross-browser extension (Chrome and Firefox) that transforms Twitter/X and Instagram links to alternative hostnames, enabling proper link previews in Discord, Telegram, and other messaging platforms. Adds convenient per-post buttons to copy transformed links directly from your timeline.
+A cross-browser extension (Chrome and Firefox) that transforms Twitter/X and Instagram links to alternative hostnames, enabling proper link previews in Discord, Telegram, and other messaging platforms. Integrates seamlessly with native share menus to copy transformed links directly from posts.
 
 ## Project Structure
 
@@ -13,8 +13,8 @@ A cross-browser extension (Chrome and Firefox) that transforms Twitter/X and Ins
 ├── background/
 │   └── background.js            # Background service worker
 ├── content/
-│   ├── twitter-content.js       # Content script for Twitter/X (per-post buttons)
-│   └── instagram-content.js     # Content script for Instagram (per-post buttons)
+│   ├── twitter-share-menu.js    # Content script for Twitter/X (share menu integration)
+│   └── instagram-share-menu.js  # Content script for Instagram (share menu integration)
 ├── popup/
 │   ├── popup.html               # Popup interface HTML
 │   ├── popup.css                # Popup styling
@@ -24,9 +24,10 @@ A cross-browser extension (Chrome and Firefox) that transforms Twitter/X and Ins
 ├── utils/
 │   ├── post-detector.js         # Post container detection
 │   ├── post-url-extractor.js    # URL extraction from posts
-│   ├── per-post-button.js       # Button creation and styling
-│   ├── button-injector.js       # Button injection logic
-│   └── post-registry.js         # Post tracking and deduplication
+│   ├── share-menu-detector.js   # Share menu detection and monitoring
+│   ├── share-menu-injector.js   # Menu item creation and injection
+│   ├── feedback-manager.js      # Visual feedback for user actions
+│   └── url-transformer.js       # URL hostname transformation
 └── icons/
     ├── icon16.png               # 16x16 toolbar icon
     ├── icon48.png               # 48x48 management icon
@@ -72,28 +73,30 @@ Twitter/X and Instagram links often fail to show proper previews in messaging pl
 
 ## Features
 
-### Per-Post Link Transformation
-- **Individual buttons on each post**: Every tweet and Instagram post gets its own "Copy Link" button
+### Native Share Menu Integration
+- **Seamless integration**: Adds "Copy embed link" option directly to Twitter/X and Instagram's native share menus
 - **Hostname transformation**: Converts `x.com/user/status/123` → `fixvx.com/user/status/123`
 - **Clipboard integration**: Click to copy the transformed link directly to your clipboard
-- **Visual feedback**: Button shows "✓ Copied!" confirmation when clicked
-- **Seamless integration**: Buttons match the native platform design (Twitter blue, Instagram pink)
+- **Visual feedback**: Shows "✓ Copied!" confirmation when clicked
+- **Native appearance**: Menu items match the platform's native styling and behavior
 
 ### Smart Detection
-- **Automatic injection**: Buttons appear on all visible posts as you scroll
-- **Dynamic content handling**: Works with infinite scroll and virtual scrolling
-- **Periodic recheck**: Ensures buttons persist even when Twitter/X recycles DOM elements (every 2 seconds)
-- **Fast response**: Buttons appear within 100ms of new posts loading
+- **Automatic injection**: Menu items appear instantly when you open any share menu
+- **Dynamic content handling**: Works with infinite scroll and dynamically loaded posts
+- **Fast response**: Menu items appear within 200ms of opening a share menu
+- **Multiple menu support**: Handles multiple share menus independently without conflicts
 
 ### Configuration
 - **Customizable hostnames**: Configure target domains for Twitter/X (default: fixvx.com) and Instagram (default: kkinstagram.com)
 - **Live updates**: Changes apply immediately without page reload
 - **Persistent settings**: Configuration saved across browser sessions
+- **Platform toggles**: Enable/disable the feature per platform
 
 ### Technical
 - **URL preservation**: Maintains complete paths, query parameters, and hash fragments
 - **Cross-browser compatible**: Works on Chrome and Firefox
 - **Modular architecture**: Clean separation of concerns for maintainability
+- **Graceful error handling**: Handles platform changes and missing elements without breaking
 
 ## Cross-Browser Compatibility
 
@@ -149,20 +152,23 @@ The build scripts create clean packages ready for distribution or loading in the
 
 ## How It Works
 
-1. **Post Detection**: Scans the timeline for tweet/post containers using platform-specific selectors
-2. **URL Extraction**: Extracts the unique URL for each post (handles regular posts, retweets, etc.)
-3. **Button Creation**: Creates a styled "Copy Link" button with clipboard functionality
-4. **Button Injection**: Injects the button into the post's action bar (next to like/retweet/share)
-5. **Continuous Monitoring**: MutationObserver watches for new posts + periodic recheck every 2 seconds
+1. **Share Menu Detection**: MutationObserver watches for native share menus to appear on the page
+2. **Post Association**: Identifies which post the share menu belongs to
+3. **URL Extraction**: Extracts the unique URL for the post (handles regular posts, retweets, etc.)
+4. **Menu Item Creation**: Creates a "Copy embed link" menu item styled to match the platform
+5. **Menu Item Injection**: Injects the item into the share menu alongside native options
 6. **Click Handler**: Transforms the URL hostname (e.g., `x.com` → `fixvx.com`) and copies to clipboard
-7. **Share**: Paste the transformed link in Discord, Telegram, etc. to get proper previews!
+7. **Visual Feedback**: Shows success/error feedback directly in the menu item
+8. **Share**: Paste the transformed link in Discord, Telegram, etc. to get proper previews!
 
 ## Specifications
 
 Detailed specifications available in `.kiro/specs/`:
-- **Requirements**: `.kiro/specs/per-post-redirect-buttons/requirements.md`
-- **Design**: `.kiro/specs/per-post-redirect-buttons/design.md`
-- **Tasks**: `.kiro/specs/per-post-redirect-buttons/tasks.md`
+- **Share Menu Integration**:
+  - Requirements: `.kiro/specs/share-menu-integration/requirements.md`
+  - Design: `.kiro/specs/share-menu-integration/design.md`
+  - Tasks: `.kiro/specs/share-menu-integration/tasks.md`
+- **Other Features**: See additional specs in `.kiro/specs/` directory
 
 ## License
 

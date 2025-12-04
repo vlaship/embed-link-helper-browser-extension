@@ -160,3 +160,15 @@ if (typeof module !== 'undefined' && module.exports) {
     shouldInjectButton
   };
 }
+
+// Expose to window for browser extension content scripts
+if (typeof window !== 'undefined') {
+  window.UrlTransformer = {
+    validateHostname,
+    parseUrl,
+    transformUrl,
+    isTwitterUrl,
+    isInstagramUrl,
+    shouldInjectButton
+  };
+}
