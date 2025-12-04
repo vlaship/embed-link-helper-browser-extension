@@ -90,40 +90,45 @@ function extractInstagramPostUrl(postElement) {
   }
 
   try {
-    // Strategy 1: Look for post header link
-    // Instagram posts typically have a link in the header with the post URL
-    const headerLinks = postElement.querySelectorAll('header a[href*="/p/"], header a[href*="/reel/"], header a[href*="/tv/"]');
-    for (const link of headerLinks) {
-      if (link.href && validateInstagramUrl(link.href)) {
-        return link.href;
-      }
-    }
-
-    // Strategy 2: Look for any link matching the post URL pattern
-    // Pattern: /p/ABC123/ or /reel/ABC123/ or /tv/ABC123/
-    const postLinks = postElement.querySelectorAll('a[href*="/p/"], a[href*="/reel/"], a[href*="/tv/"]');
-    for (const link of postLinks) {
-      if (link.href && validateInstagramUrl(link.href)) {
-        return link.href;
-      }
-    }
-
-    // Strategy 3: Look for time element's parent link (similar to Twitter)
+    // Strategy 1: Look for time element's parent link (most reliable for the actual post)
+    // This is typically the timestamp link that points to the post itself
     const timeElement = postElement.querySelector('time');
     if (timeElement) {
       const timeLink = timeElement.closest('a');
       if (timeLink && timeLink.href && validateInstagramUrl(timeLink.href)) {
-        return timeLink.href;
+        console.log('[post-url-extractor] Found Instagram URL via time element:', timeLink.href);
+        return cleanInstagramUrl(timeLink.href);
       }
     }
 
-    // Strategy 4: Look in article element for links
+    // Strategy 2: Look for post header link (but exclude liked_by, tagged, etc.)
+    // Instagram posts typically have a link in the header with the post URL
+    const headerLinks = postElement.querySelectorAll('header a[href*="/p/"], header a[href*="/reel/"], header a[href*="/tv/"]');
+    for (const link of headerLinks) {
+      if (link.href && validateInstagramUrl(link.href) && !link.href.includes('/liked_by/') && !link.href.includes('/tagged/')) {
+        console.log('[post-url-extractor] Found Instagram URL via header link:', link.href);
+        return cleanInstagramUrl(link.href);
+      }
+    }
+
+    // Strategy 3: Look for any link matching the post URL pattern (excluding unwanted paths)
+    // Pattern: /p/ABC123/ or /reel/ABC123/ or /tv/ABC123/
+    const postLinks = postElement.querySelectorAll('a[href*="/p/"], a[href*="/reel/"], a[href*="/tv/"]');
+    for (const link of postLinks) {
+      if (link.href && validateInstagramUrl(link.href) && !link.href.includes('/liked_by/') && !link.href.includes('/tagged/')) {
+        console.log('[post-url-extractor] Found Instagram URL via post link:', link.href);
+        return cleanInstagramUrl(link.href);
+      }
+    }
+
+    // Strategy 4: Look in article element for links (last resort)
     const articleElement = postElement.tagName === 'ARTICLE' ? postElement : postElement.querySelector('article');
     if (articleElement) {
       const articleLinks = articleElement.querySelectorAll('a[href*="/p/"], a[href*="/reel/"], a[href*="/tv/"]');
       for (const link of articleLinks) {
-        if (link.href && validateInstagramUrl(link.href)) {
-          return link.href;
+        if (link.href && validateInstagramUrl(link.href) && !link.href.includes('/liked_by/') && !link.href.includes('/tagged/')) {
+          console.log('[post-url-extractor] Found Instagram URL via article link:', link.href);
+          return cleanInstagramUrl(link.href);
         }
       }
     }
@@ -133,6 +138,22 @@ function extractInstagramPostUrl(postElement) {
   } catch (error) {
     console.error('[post-url-extractor] Error extracting Instagram post URL:', error);
     return null;
+  }
+}
+
+/**
+ * Clean Instagram URL by removing query parameters
+ * @param {string} url - The Instagram URL to clean
+ * @returns {string} The cleaned URL
+ */
+function cleanInstagramUrl(url) {
+  try {
+    const urlObj = new URL(url);
+    // Return URL without query parameters or hash
+    return `${urlObj.protocol}//${urlObj.hostname}${urlObj.pathname}`;
+  } catch (error) {
+    // If URL parsing fails, return original
+    return url;
   }
 }
 
@@ -269,7 +290,8 @@ if (typeof module !== 'undefined' && module.exports) {
     extractPostUrl,
     validatePostUrl,
     validateTwitterUrl,
-    validateInstagramUrl
+    validateInstagramUrl,
+    cleanInstagramUrl
   };
 }
 
@@ -281,6 +303,7 @@ if (typeof window !== 'undefined') {
     extractPostUrl,
     validatePostUrl,
     validateTwitterUrl,
-    validateInstagramUrl
+    validateInstagramUrl,
+    cleanInstagramUrl
   };
 }
