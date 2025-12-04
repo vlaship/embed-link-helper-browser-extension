@@ -9,6 +9,7 @@ dist-chrome/
 # IDE
 .vscode/
 .idea/
+.kiro/
 
 # OS
 .DS_Store
