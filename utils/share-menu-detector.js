@@ -95,7 +95,7 @@ function observeShareMenus(platform, callback) {
           if (element.matches && element.matches(selector)) {
             lastClickedShareButton = element;
             lastClickTime = Date.now();
-            console.log('[share-menu-detector] Share button clicked', { 
+            window.Logger.log('[share-menu-detector] Share button clicked', { 
               selector,
               element: element.outerHTML ? element.outerHTML.substring(0, 100) : 'unknown'
             });
@@ -115,7 +115,7 @@ function observeShareMenus(platform, callback) {
         if (testId === 'share' || (ariaLabel && ariaLabel.toLowerCase().includes('share'))) {
           lastClickedShareButton = element;
           lastClickTime = Date.now();
-          console.log('[share-menu-detector] Share button clicked via attribute', { 
+          window.Logger.log('[share-menu-detector] Share button clicked via attribute', { 
             testId,
             ariaLabel
           });
@@ -153,7 +153,7 @@ function observeShareMenus(platform, callback) {
                 }
               });
             } catch (error) {
-              console.warn(`[share-menu-detector] Selector failed: ${selector}`, error);
+              window.Logger.warn(`[share-menu-detector] Selector failed: ${selector}`, error);
             }
           }
 
@@ -183,7 +183,7 @@ function observeShareMenus(platform, callback) {
     subtree: true
   });
 
-  console.log(`[share-menu-detector] Started observing ${platform} share menus`);
+  window.Logger.log(`[share-menu-detector] Started observing ${platform} share menus`);
   return observer;
 }
 
@@ -195,12 +195,12 @@ function observeShareMenus(platform, callback) {
  */
 function findAssociatedPost(menuElement, platform) {
   if (!menuElement || !(menuElement instanceof HTMLElement)) {
-    console.warn('[share-menu-detector] Invalid menu element provided');
+    window.Logger.warn('[share-menu-detector] Invalid menu element provided');
     return null;
   }
 
   if (!platform || !SHARE_MENU_SELECTORS[platform]) {
-    console.warn(`[share-menu-detector] Invalid platform: ${platform}`);
+    window.Logger.warn(`[share-menu-detector] Invalid platform: ${platform}`);
     return null;
   }
 
@@ -210,12 +210,12 @@ function findAssociatedPost(menuElement, platform) {
     // Strategy 0: Use the last clicked share button if it was clicked recently (within 2 seconds)
     const timeSinceClick = Date.now() - lastClickTime;
     if (lastClickedShareButton && timeSinceClick < 2000) {
-      console.log('[share-menu-detector] Using tracked share button', { timeSinceClick });
+      window.Logger.log('[share-menu-detector] Using tracked share button', { timeSinceClick });
       let current = lastClickedShareButton;
       while (current && current !== document.body) {
         for (const selector of config.postContainer) {
           if (current.matches && current.matches(selector)) {
-            console.log('[share-menu-detector] Found post via tracked share button');
+            window.Logger.log('[share-menu-detector] Found post via tracked share button');
             return current;
           }
         }
@@ -255,7 +255,7 @@ function findAssociatedPost(menuElement, platform) {
       while (current && current !== document.body) {
         for (const selector of config.postContainer) {
           if (current.matches && current.matches(selector)) {
-            console.log('[share-menu-detector] Found post via closest share button', { distance: closestDistance });
+            window.Logger.log('[share-menu-detector] Found post via closest share button', { distance: closestDistance });
             return current;
           }
         }
@@ -269,7 +269,7 @@ function findAssociatedPost(menuElement, platform) {
     
     if (allPosts.length === 1) {
       // If there's only one post visible, it's likely the associated one
-      console.log('[share-menu-detector] Found single post in DOM');
+      window.Logger.log('[share-menu-detector] Found single post in DOM');
       return allPosts[0];
     }
 
@@ -305,11 +305,11 @@ function findAssociatedPost(menuElement, platform) {
     }
     
     if (closestPost) {
-      console.log('[share-menu-detector] Found closest post in viewport', { distance: closestPostDistance });
+      window.Logger.log('[share-menu-detector] Found closest post in viewport', { distance: closestPostDistance });
       return closestPost;
     }
 
-    console.warn('[share-menu-detector] Could not find associated post for share menu');
+    window.Logger.warn('[share-menu-detector] Could not find associated post for share menu');
     return null;
   } catch (error) {
     console.error('[share-menu-detector] Error finding associated post:', error);

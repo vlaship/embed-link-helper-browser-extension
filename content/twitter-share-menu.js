@@ -32,32 +32,37 @@ function getMenuIdentifier(menuElement) {
  * Initialize share menu observer
  */
 async function init() {
-  console.log('[twitter-share-menu] Initializing Twitter share menu integration');
-  
-  // Verify utilities are loaded
-  if (!window.UrlTransformer) {
-    console.error('[twitter-share-menu] UrlTransformer not loaded!');
-  }
-  if (!window.FeedbackManager) {
-    console.error('[twitter-share-menu] FeedbackManager not loaded!');
-  }
-  if (!window.PostUrlExtractor) {
-    console.error('[twitter-share-menu] PostUrlExtractor not loaded!');
-  }
-  if (!window.ShareMenuDetector) {
-    console.error('[twitter-share-menu] ShareMenuDetector not loaded!');
-  }
-  if (!window.ShareMenuInjector) {
-    console.error('[twitter-share-menu] ShareMenuInjector not loaded!');
-  }
-  
   try {
     // Load configuration
     currentConfig = await getConfig();
     
+    // Initialize logger with config
+    if (window.Logger) {
+      await window.Logger.initLogger(currentConfig);
+    }
+    
+    window.Logger.log('[twitter-share-menu] Initializing Twitter share menu integration');
+    
+    // Verify utilities are loaded
+    if (!window.UrlTransformer) {
+      window.Logger.error('[twitter-share-menu] UrlTransformer not loaded!');
+    }
+    if (!window.FeedbackManager) {
+      window.Logger.error('[twitter-share-menu] FeedbackManager not loaded!');
+    }
+    if (!window.PostUrlExtractor) {
+      window.Logger.error('[twitter-share-menu] PostUrlExtractor not loaded!');
+    }
+    if (!window.ShareMenuDetector) {
+      window.Logger.error('[twitter-share-menu] ShareMenuDetector not loaded!');
+    }
+    if (!window.ShareMenuInjector) {
+      window.Logger.error('[twitter-share-menu] ShareMenuInjector not loaded!');
+    }
+    
     // Check if Twitter redirect is enabled
     if (!currentConfig.twitter.enabled) {
-      console.log('[twitter-share-menu] Twitter redirect is disabled, not initializing');
+      window.Logger.log('[twitter-share-menu] Twitter redirect is disabled, not initializing');
       return;
     }
     
@@ -67,9 +72,9 @@ async function init() {
     // Listen for configuration updates
     browser.storage.onChanged.addListener(handleConfigUpdate);
     
-    console.log('[twitter-share-menu] Initialization complete');
+    window.Logger.log('[twitter-share-menu] Initialization complete');
   } catch (error) {
-    console.error('[twitter-share-menu] Initialization error:', error);
+    window.Logger.error('[twitter-share-menu] Initialization error:', error);
   }
 }
 
@@ -79,18 +84,18 @@ async function init() {
  */
 function handleShareMenuDetected(menuElement) {
   const menuId = getMenuIdentifier(menuElement);
-  console.log('[twitter-share-menu] Share menu detected', { menuId });
+  window.Logger.log('[twitter-share-menu] Share menu detected', { menuId });
   
   // Layer 1: WeakSet check
   if (processedMenus.has(menuElement)) {
-    console.log('[twitter-share-menu] Menu already in WeakSet, skipping', { menuId });
+    window.Logger.log('[twitter-share-menu] Menu already in WeakSet, skipping', { menuId });
     return;
   }
   
   // Layer 2: DOM check for existing menu item in this menu
   const existingItem = menuElement.querySelector('.embed-link-menu-item');
   if (existingItem) {
-    console.log('[twitter-share-menu] Menu item already exists in DOM, skipping', {
+    window.Logger.log('[twitter-share-menu] Menu item already exists in DOM, skipping', {
       menuId,
       existingItemId: existingItem.getAttribute('data-item-id')
     });
@@ -105,7 +110,7 @@ function handleShareMenuDetected(menuElement) {
   while (currentParent && currentParent !== document.body) {
     const parentMenuItem = currentParent.querySelector('.embed-link-menu-item');
     if (parentMenuItem) {
-      console.log('[twitter-share-menu] Parent element already has menu item, skipping nested menu', { menuId });
+      window.Logger.log('[twitter-share-menu] Parent element already has menu item, skipping nested menu', { menuId });
       processedMenus.add(menuElement);
       return;
     }
@@ -118,25 +123,25 @@ function handleShareMenuDetected(menuElement) {
   try {
     // Check if Twitter redirect is enabled
     if (!currentConfig || !currentConfig.twitter.enabled) {
-      console.log('[twitter-share-menu] Twitter redirect is disabled, skipping injection');
+      window.Logger.log('[twitter-share-menu] Twitter redirect is disabled, skipping injection');
       return;
     }
     
     // Find the associated post
     const postElement = window.ShareMenuDetector.findAssociatedPost(menuElement, 'twitter');
     if (!postElement) {
-      console.warn('[twitter-share-menu] Could not find associated post');
+      window.Logger.warn('[twitter-share-menu] Could not find associated post');
       return;
     }
     
     // Extract post URL
     const postUrl = window.PostUrlExtractor.extractPostUrl(postElement, 'twitter');
     if (!postUrl) {
-      console.warn('[twitter-share-menu] Could not extract post URL');
+      window.Logger.warn('[twitter-share-menu] Could not extract post URL');
       return;
     }
     
-    console.log('[twitter-share-menu] Post URL extracted:', postUrl);
+    window.Logger.log('[twitter-share-menu] Post URL extracted:', postUrl);
     
     // Get target hostname from config
     const targetHostname = currentConfig.twitter.targetHostname;
@@ -170,9 +175,9 @@ function handleShareMenuDetected(menuElement) {
     const injected = window.ShareMenuInjector.injectMenuItem(menuItem, menuElement, 'twitter');
     
     if (injected) {
-      console.log('[twitter-share-menu] Menu item injected successfully', { menuId });
+      window.Logger.log('[twitter-share-menu] Menu item injected successfully', { menuId });
     } else {
-      console.warn('[twitter-share-menu] Failed to inject menu item', { menuId });
+      window.Logger.warn('[twitter-share-menu] Failed to inject menu item', { menuId });
     }
   } catch (error) {
     console.error('[twitter-share-menu] Error processing share menu:', error);
@@ -186,7 +191,7 @@ function handleShareMenuDetected(menuElement) {
  * @param {string} targetHostname - The target hostname for transformation
  */
 async function handleMenuItemClick(event, postUrl, targetHostname) {
-  console.log('[twitter-share-menu] Menu item clicked');
+  window.Logger.log('[twitter-share-menu] Menu item clicked');
   
   const menuItem = event.currentTarget;
   
@@ -201,12 +206,12 @@ async function handleMenuItemClick(event, postUrl, targetHostname) {
       return;
     }
     
-    console.log('[twitter-share-menu] URL transformed:', transformedUrl);
+    window.Logger.log('[twitter-share-menu] URL transformed:', transformedUrl);
     
     // Copy to clipboard
     try {
       await navigator.clipboard.writeText(transformedUrl);
-      console.log('[twitter-share-menu] URL copied to clipboard');
+      window.Logger.log('[twitter-share-menu] URL copied to clipboard');
       
       // Show success feedback
       window.FeedbackManager.showSuccessFeedback(menuItem, 'twitter');
@@ -225,7 +230,7 @@ async function handleMenuItemClick(event, postUrl, targetHostname) {
         document.execCommand('copy');
         document.body.removeChild(textArea);
         
-        console.log('[twitter-share-menu] URL copied using fallback method');
+        window.Logger.log('[twitter-share-menu] URL copied using fallback method');
         window.FeedbackManager.showSuccessFeedback(menuItem, 'twitter');
         window.FeedbackManager.hideFeedbackAfterDelay(menuItem, 2000);
       } catch (fallbackError) {
@@ -251,7 +256,7 @@ function handleConfigUpdate(changes, areaName) {
     return;
   }
   
-  console.log('[twitter-share-menu] Configuration updated');
+  window.Logger.log('[twitter-share-menu] Configuration updated');
   
   const newConfig = changes.config.newValue;
   
@@ -264,14 +269,14 @@ function handleConfigUpdate(changes, areaName) {
   
   // If Twitter redirect was disabled, stop observing
   if (!newConfig.twitter.enabled && observer) {
-    console.log('[twitter-share-menu] Twitter redirect disabled, stopping observer');
+    window.Logger.log('[twitter-share-menu] Twitter redirect disabled, stopping observer');
     observer.disconnect();
     observer = null;
   }
   
   // If Twitter redirect was enabled, start observing
   if (newConfig.twitter.enabled && !observer) {
-    console.log('[twitter-share-menu] Twitter redirect enabled, starting observer');
+    window.Logger.log('[twitter-share-menu] Twitter redirect enabled, starting observer');
     observer = window.ShareMenuDetector.observeShareMenus('twitter', handleShareMenuDetected);
   }
 }

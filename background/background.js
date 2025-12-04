@@ -22,7 +22,8 @@ const DEFAULT_CONFIG = {
   instagram: {
     enabled: true,
     targetHostname: "kkinstagram.com"
-  }
+  },
+  debugLogging: false
 };
 
 /**
@@ -130,7 +131,8 @@ async function getStoredConfig() {
       instagram: {
         ...defaultConfig.instagram,
         ...result.config.instagram
-      }
+      },
+      debugLogging: result.config.debugLogging !== undefined ? result.config.debugLogging : defaultConfig.debugLogging
     };
   } catch (error) {
     console.error('Error retrieving config from storage:', error);

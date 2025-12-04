@@ -12,7 +12,8 @@ const DEFAULT_CONFIG = {
   instagram: {
     enabled: true,
     targetHostname: "kkinstagram.com"
-  }
+  },
+  debugLogging: false
 };
 
 /**
@@ -132,7 +133,8 @@ async function getConfig() {
       instagram: {
         ...defaultConfig.instagram,
         ...result.config.instagram
-      }
+      },
+      debugLogging: result.config.debugLogging !== undefined ? result.config.debugLogging : defaultConfig.debugLogging
     };
     
     // Validate merged config (in case partial config has invalid values)
