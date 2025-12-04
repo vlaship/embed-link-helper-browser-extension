@@ -37,7 +37,7 @@ const SELECTORS = {
  * @returns {Array<HTMLElement>} Array of post container elements
  */
 function findPostContainers(platform, root = document) {
-  if (!platform || !SELECTORS[platform]) {
+  if (!platform || !SELECTORS.hasOwnProperty(platform)) {
     console.warn(`[post-detector] Invalid platform: ${platform}`);
     return [];
   }
@@ -166,7 +166,7 @@ function isInstagramPostContainer(element) {
  * @returns {Object|null} Selector configuration object
  */
 function getSelectorConfig(platform) {
-  return SELECTORS[platform] || null;
+  return SELECTORS.hasOwnProperty(platform) ? SELECTORS[platform] : null;
 }
 
 // Export functions
