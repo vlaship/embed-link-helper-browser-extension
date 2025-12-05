@@ -26,7 +26,7 @@ function incrementVersion() {
   fs.writeFileSync('package.json', JSON.stringify(packageJson, null, 2) + '\n');
   
   // Update manifest files
-  ['manifest.json', 'manifest-firefox.json', 'manifest-v3.json'].forEach(file => {
+  ['manifest.json', 'manifest-firefox.json', 'manifest-chrome.json'].forEach(file => {
     if (fs.existsSync(file)) {
       const manifest = JSON.parse(fs.readFileSync(file, 'utf8'));
       manifest.version = newVersion;
