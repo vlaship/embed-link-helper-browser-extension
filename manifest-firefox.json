@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Embed Link Helper",
-  "version": "1.0.7",
+  "version": "1.1.0",
   "description": "Integrates with Twitter/X and Instagram share menus to copy transformed links for better previews in messaging platforms",
   "permissions": [
     "storage",
