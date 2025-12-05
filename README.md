@@ -26,7 +26,10 @@ A cross-browser extension (Chrome and Firefox) that transforms Twitter/X and Ins
 │   ├── post-url-extractor.js    # URL extraction from posts
 │   ├── share-menu-detector.js   # Share menu detection and monitoring
 │   ├── share-menu-injector.js   # Menu item creation and injection
+│   ├── share-menu-integration.js # Share menu integration orchestration
 │   ├── feedback-manager.js      # Visual feedback for user actions
+│   ├── clipboard-manager.js     # Clipboard operations
+│   ├── logger.js                # Debug logging utility
 │   └── url-transformer.js       # URL hostname transformation
 └── icons/
     ├── icon16.png               # 16x16 toolbar icon
@@ -91,6 +94,7 @@ Twitter/X and Instagram links often fail to show proper previews in messaging pl
 - **Live updates**: Changes apply immediately without page reload
 - **Persistent settings**: Configuration saved across browser sessions
 - **Platform toggles**: Enable/disable the feature per platform
+- **Debug logging**: Toggle debug mode for troubleshooting and development
 
 ### Technical
 - **URL preservation**: Maintains complete paths, query parameters, and hash fragments
@@ -118,9 +122,23 @@ npm install
 ```
 
 ### Testing
+
+The project includes comprehensive test coverage with 137+ passing tests:
+
 ```bash
+# Run all tests
 npm test
+
+# Run tests in watch mode
+npm run test:watch
 ```
+
+**Test Coverage**:
+- Unit tests for all utility modules
+- Integration tests for share menu functionality
+- Property-based testing with fast-check
+- Code elimination verification tests
+- Polyfill usage validation
 
 ### Building for Different Browsers
 
@@ -147,8 +165,9 @@ The build scripts create clean packages ready for distribution or loading in the
 - Manifest V3 (Chrome) / V2 (Firefox)
 - WebExtensions API for cross-browser support
 - `webextension-polyfill` for API consistency
-- Jest for unit testing
+- Jest for unit testing with jsdom environment
 - fast-check for property-based testing
+- Modular architecture with comprehensive test coverage
 
 ## How It Works
 
@@ -161,14 +180,12 @@ The build scripts create clean packages ready for distribution or loading in the
 7. **Visual Feedback**: Shows success/error feedback directly in the menu item
 8. **Share**: Paste the transformed link in Discord, Telegram, etc. to get proper previews!
 
-## Specifications
+## Debug Mode
 
-Detailed specifications available in `.kiro/specs/`:
-- **Share Menu Integration**:
-  - Requirements: `.kiro/specs/share-menu-integration/requirements.md`
-  - Design: `.kiro/specs/share-menu-integration/design.md`
-  - Tasks: `.kiro/specs/share-menu-integration/tasks.md`
-- **Other Features**: See additional specs in `.kiro/specs/` directory
+The extension includes a debug logging feature that can be toggled from the popup:
+- Enable/disable debug logs without reloading the extension
+- Logs are output to the browser console for troubleshooting
+- Useful for development and debugging share menu integration issues
 
 ## License
 
