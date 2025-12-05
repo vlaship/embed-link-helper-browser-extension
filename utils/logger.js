@@ -11,6 +11,9 @@ let debugEnabled = false;
 async function initLogger(config) {
   if (config && config.debugLogging !== undefined) {
     debugEnabled = config.debugLogging;
+  } else {
+    // If config is missing or debugLogging is undefined, default to false
+    debugEnabled = false;
   }
 }
 
