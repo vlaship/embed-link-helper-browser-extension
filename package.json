@@ -1,6 +1,6 @@
 {
   "name": "embed-link-helper-browser-extension",
-  "version": "1.0.2",
+  "version": "1.0.7",
   "description": "Browser extension that adds redirect buttons to Twitter/X and Instagram pages",
   "scripts": {
     "test": "jest",

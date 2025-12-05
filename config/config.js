@@ -12,7 +12,8 @@ const DEFAULT_CONFIG = {
   instagram: {
     enabled: true,
     targetHostname: "kkinstagram.com"
-  }
+  },
+  debugLogging: false
 };
 
 /**
@@ -132,7 +133,8 @@ async function getConfig() {
       instagram: {
         ...defaultConfig.instagram,
         ...result.config.instagram
-      }
+      },
+      debugLogging: result.config.debugLogging !== undefined ? result.config.debugLogging : defaultConfig.debugLogging
     };
     
     // Validate merged config (in case partial config has invalid values)
@@ -186,6 +188,17 @@ async function clearConfig() {
 if (typeof module !== 'undefined' && module.exports) {
   // Node.js/CommonJS environment (for testing)
   module.exports = {
+    DEFAULT_CONFIG,
+    getDefaultConfig,
+    validateHostname,
+    validateConfig,
+    getConfig,
+    saveConfig,
+    clearConfig
+  };
+} else if (typeof window !== 'undefined') {
+  // Browser environment - expose to window object
+  window.Config = {
     DEFAULT_CONFIG,
     getDefaultConfig,
     validateHostname,

@@ -5,6 +5,7 @@
 // DOM elements
 let twitterInput;
 let instagramInput;
+let debugLoggingCheckbox;
 let saveButton;
 let errorMessage;
 
@@ -15,6 +16,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Get DOM elements
   twitterInput = document.getElementById('twitter-hostname');
   instagramInput = document.getElementById('instagram-hostname');
+  debugLoggingCheckbox = document.getElementById('debug-logging');
   saveButton = document.getElementById('save-button');
   errorMessage = document.getElementById('error-message');
 
@@ -66,6 +68,11 @@ async function loadCurrentConfig() {
 
       if (config.instagram && config.instagram.targetHostname) {
         instagramInput.value = config.instagram.targetHostname;
+      }
+
+      // Set debug logging checkbox
+      if (config.debugLogging !== undefined) {
+        debugLoggingCheckbox.checked = config.debugLogging;
       }
     } else {
       // If no config, leave placeholders visible
@@ -153,7 +160,8 @@ async function saveConfiguration() {
       instagram: {
         enabled: true,
         targetHostname: instagramHostname
-      }
+      },
+      debugLogging: debugLoggingCheckbox.checked
     };
 
     // Send save request to background script

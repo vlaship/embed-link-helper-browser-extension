@@ -26,7 +26,7 @@ function incrementVersion() {
   fs.writeFileSync('package.json', JSON.stringify(packageJson, null, 2) + '\n');
   
   // Update manifest files
-  ['manifest.json', 'manifest-firefox.json', 'manifest-v3.json'].forEach(file => {
+  ['manifest.json', 'manifest-firefox.json', 'manifest-chrome.json'].forEach(file => {
     if (fs.existsSync(file)) {
       const manifest = JSON.parse(fs.readFileSync(file, 'utf8'));
       manifest.version = newVersion;
@@ -42,7 +42,7 @@ const newVersion = incrementVersion();
 // Configuration
 const distDir = 'dist-chrome';
 const filesToCopy = [
-  'manifest-v3.json',
+  'manifest-chrome.json',
   'background',
   'content',
   'popup',
@@ -53,7 +53,7 @@ const filesToCopy = [
 ];
 
 const filesToRename = {
-  'manifest-v3.json': 'manifest.json'
+  'manifest-chrome.json': 'manifest.json'
 };
 
 /**

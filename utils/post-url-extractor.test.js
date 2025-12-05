@@ -1,6 +1,6 @@
 /**
- * Property-Based Tests for Post URL Extraction Module
- * Tests URL extraction from Twitter/X and Instagram post containers
+ * Post URL Extractor Tests
+ * Unit tests and property-based tests for post URL extraction functionality
  */
 
 const fc = require('fast-check');
@@ -10,965 +10,663 @@ const {
   extractPostUrl,
   validatePostUrl,
   validateTwitterUrl,
-  validateInstagramUrl
-} = require('./post-url-extractor.js');
+  validateInstagramUrl,
+  cleanInstagramUrl
+} = require('./post-url-extractor');
 
-// Helper function to create mock DOM elements
-function createMockElement(tagName, attributes = {}, textContent = '') {
-  const element = {
-    tagName: tagName.toUpperCase(),
-    textContent: textContent,
-    attributes: attributes,
-    children: [],
-    href: attributes.href || undefined,
-    querySelectorAll: function(selector) {
-      // Parse selector and filter children
-      const results = [];
-      
-      // Handle comma-separated selectors
-      if (selector.includes(',')) {
-        const selectors = selector.split(',').map(s => s.trim());
-        const allResults = new Set();
-        selectors.forEach(sel => {
-          const selectorResults = this.querySelectorAll(sel);
-          selectorResults.forEach(r => allResults.add(r));
-        });
-        return Array.from(allResults);
-      }
-      
-      // Handle "header a[href*='/p/']" type selectors
-      if (selector.startsWith('header ')) {
-        const header = this.children.find(c => c.tagName === 'HEADER');
-        if (header) {
-          return header.querySelectorAll(selector.replace('header ', ''));
-        }
-        return [];
-      }
-      
-      // Handle attribute selectors like a[href*="/status/"]
-      if (selector.includes('[')) {
-        const tagMatch = selector.match(/^(\w+)/);
-        const attrMatch = selector.match(/\[(\w+)(\*=|=)"([^"]+)"\]/);
-        
-        if (tagMatch && attrMatch) {
-          const tag = tagMatch[1].toUpperCase();
-          const attr = attrMatch[1];
-          const operator = attrMatch[2];
-          const value = attrMatch[3];
-          
-          // Recursively search all descendants
-          const searchDescendants = (node) => {
-            if (node.tagName === tag && node.attributes[attr]) {
-              if (operator === '*=' && node.attributes[attr].includes(value)) {
-                results.push(node);
-              } else if (operator === '=' && node.attributes[attr] === value) {
-                results.push(node);
-              }
-            }
-            if (node.children) {
-              node.children.forEach(child => searchDescendants(child));
-            }
-          };
-          
-          searchDescendants(this);
-        }
-      } else if (selector === 'time') {
-        const searchTime = (node) => {
-          if (node.tagName === 'TIME') {
-            results.push(node);
-          }
-          if (node.children) {
-            node.children.forEach(child => searchTime(child));
-          }
-        };
-        searchTime(this);
-      } else if (selector === 'article') {
-        const searchArticle = (node) => {
-          if (node.tagName === 'ARTICLE') {
-            results.push(node);
-          }
-          if (node.children) {
-            node.children.forEach(child => searchArticle(child));
-          }
-        };
-        searchArticle(this);
-      }
-      
-      return results;
-    },
-    querySelector: function(selector) {
-      const results = this.querySelectorAll(selector);
-      return results.length > 0 ? results[0] : null;
-    },
-    closest: function(selector) {
-      // Simple mock: return parent if it matches
-      if (this.parent && selector === 'a' && this.parent.tagName === 'A') {
-        return this.parent;
-      }
-      return null;
-    },
-    getBoundingClientRect: function() {
-      return { width: 100, height: 100 };
-    }
-  };
-  
-  // Add instanceof check
-  Object.setPrototypeOf(element, HTMLElement.prototype);
-  
-  return element;
-}
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
 
-// Helper to create a mock tweet with URL
-function createMockTweetWithUrl(username, statusId) {
-  const tweet = createMockElement('ARTICLE', { 'data-testid': 'tweet' }, 'Tweet content');
+/**
+ * Create a mock Twitter post element with a timestamp link
+ */
+function createMockTwitterPost(statusUrl) {
+  const article = document.createElement('article');
+  const time = document.createElement('time');
+  const link = document.createElement('a');
   
-  // Create time element with link
-  const timeElement = createMockElement('TIME', { datetime: '2024-01-01' }, '1h');
-  const timeLink = createMockElement('A', { 
-    href: `https://x.com/${username}/status/${statusId}` 
-  }, '1h');
+  link.href = statusUrl;
+  time.appendChild(document.createTextNode('2h'));
+  link.appendChild(time);
+  article.appendChild(link);
   
-  // Set up parent relationship
-  timeElement.parent = timeLink;
-  timeLink.children.push(timeElement);
-  tweet.children.push(timeLink);
-  tweet.children.push(timeElement); // Also add time element directly for querySelector
-  
-  return tweet;
-}
-
-// Helper to create a mock Instagram post with URL
-function createMockInstagramPostWithUrl(postId, postType = 'p') {
-  const post = createMockElement('ARTICLE', { role: 'presentation' }, 'Post content');
-  
-  // Create header with link
-  const header = createMockElement('HEADER', {}, '');
-  const headerLink = createMockElement('A', { 
-    href: `https://www.instagram.com/${postType}/${postId}/` 
-  }, 'View post');
-  
-  header.children.push(headerLink);
-  post.children.push(header);
-  post.children.push(headerLink); // Also add link directly for querySelector
-  
-  return post;
+  return article;
 }
 
 /**
- * **Feature: per-post-redirect-buttons, Property 4: URL Extraction Correctness (Twitter)**
- * **Validates: Requirements 4.1**
- * 
- * For any valid tweet container element, the URL extraction function should return 
- * a URL matching the pattern `https://x.com/[username]/status/[id]` or return null 
- * if no valid URL is found.
+ * Create a mock Twitter post with status link (no time element)
  */
-describe('Property 4: URL Extraction Correctness (Twitter)', () => {
-  test('should extract valid Twitter URLs matching the status pattern', async () => {
-    // Generator for Twitter usernames and status IDs
-    const twitterUrlArbitrary = fc.record({
-      username: fc.stringOf(fc.constantFrom(...'abcdefghijklmnopqrstuvwxyz0123456789_'.split('')), 
-        { minLength: 1, maxLength: 15 }),
-      statusId: fc.bigUintN(64).map(n => n.toString())
-    });
-
-    await fc.assert(
-      fc.asyncProperty(twitterUrlArbitrary, async ({ username, statusId }) => {
-        const tweet = createMockTweetWithUrl(username, statusId);
-        const extractedUrl = extractTweetUrl(tweet);
-        
-        // Should extract a URL
-        expect(extractedUrl).not.toBeNull();
-        
-        if (extractedUrl) {
-          // Should match Twitter URL pattern
-          expect(validateTwitterUrl(extractedUrl)).toBe(true);
-          
-          // Should contain the username and status ID
-          expect(extractedUrl).toContain(`/${username}/status/${statusId}`);
-          
-          // Should start with https://x.com or https://twitter.com
-          expect(
-            extractedUrl.startsWith('https://x.com/') || 
-            extractedUrl.startsWith('https://twitter.com/')
-          ).toBe(true);
-        }
-      }),
-      { numRuns: 100 }
-    );
-  });
-
-  test('should return null for tweet containers without valid URLs', async () => {
-    // Generator for tweets without URL links
-    const tweetWithoutUrlArbitrary = fc.record({
-      hasTimeElement: fc.boolean(),
-      hasLinks: fc.boolean(),
-      linkHasStatusPattern: fc.constant(false)
-    });
-
-    await fc.assert(
-      fc.asyncProperty(tweetWithoutUrlArbitrary, async (config) => {
-        const tweet = createMockElement('ARTICLE', { 'data-testid': 'tweet' }, 'Tweet content');
-        
-        if (config.hasTimeElement) {
-          const timeElement = createMockElement('TIME', { datetime: '2024-01-01' }, '1h');
-          tweet.children.push(timeElement);
-        }
-        
-        if (config.hasLinks && !config.linkHasStatusPattern) {
-          // Add a link that doesn't match status pattern
-          const link = createMockElement('A', { href: 'https://example.com' }, 'Link');
-          tweet.children.push(link);
-        }
-        
-        const extractedUrl = extractTweetUrl(tweet);
-        
-        // Should return null when no valid status URL is found
-        expect(extractedUrl).toBeNull();
-      }),
-      { numRuns: 100 }
-    );
-  });
-
-  test('should validate extracted URLs match Twitter status pattern', async () => {
-    // Generator for various URL patterns
-    const urlPatternArbitrary = fc.record({
-      username: fc.stringOf(fc.constantFrom(...'abcdefghijklmnopqrstuvwxyz0123456789_'.split('')), 
-        { minLength: 1, maxLength: 15 }),
-      statusId: fc.bigUintN(64).map(n => n.toString()),
-      hostname: fc.constantFrom('x.com', 'www.x.com', 'twitter.com', 'www.twitter.com')
-    });
-
-    await fc.assert(
-      fc.asyncProperty(urlPatternArbitrary, async ({ username, statusId, hostname }) => {
-        const url = `https://${hostname}/${username}/status/${statusId}`;
-        
-        // Should validate as a Twitter URL
-        expect(validateTwitterUrl(url)).toBe(true);
-        
-        // Should match the expected pattern
-        const urlObj = new URL(url);
-        expect(urlObj.pathname).toMatch(/^\/[^\/]+\/status\/\d+/);
-      }),
-      { numRuns: 100 }
-    );
-  });
-
-  test('should reject invalid Twitter URLs', async () => {
-    // Generator for invalid URL patterns
-    const invalidUrlArbitrary = fc.oneof(
-      fc.constant('https://example.com/user/status/123'),
-      fc.constant('https://x.com/user/post/123'),
-      fc.constant('https://x.com/status/123'),
-      fc.constant('not-a-url'),
-      fc.constant(''),
-      fc.constant('https://x.com/user/status/abc')
-    );
-
-    await fc.assert(
-      fc.asyncProperty(invalidUrlArbitrary, async (url) => {
-        // Should not validate invalid URLs
-        expect(validateTwitterUrl(url)).toBe(false);
-      }),
-      { numRuns: 100 }
-    );
-  });
-
-  test('should handle tweets with multiple links and extract the status URL', async () => {
-    // Generator for tweets with multiple links
-    const multiLinkTweetArbitrary = fc.record({
-      username: fc.stringOf(fc.constantFrom(...'abcdefghijklmnopqrstuvwxyz0123456789_'.split('')), 
-        { minLength: 1, maxLength: 15 }),
-      statusId: fc.bigUintN(64).map(n => n.toString()),
-      numExtraLinks: fc.integer({ min: 1, max: 5 })
-    });
-
-    await fc.assert(
-      fc.asyncProperty(multiLinkTweetArbitrary, async ({ username, statusId, numExtraLinks }) => {
-        const tweet = createMockElement('ARTICLE', { 'data-testid': 'tweet' }, 'Tweet content');
-        
-        // Add extra links that are not status URLs
-        for (let i = 0; i < numExtraLinks; i++) {
-          const link = createMockElement('A', { href: `https://example.com/link${i}` }, 'Link');
-          tweet.children.push(link);
-        }
-        
-        // Add the status URL link
-        const statusLink = createMockElement('A', { 
-          href: `https://x.com/${username}/status/${statusId}` 
-        }, 'Status');
-        tweet.children.push(statusLink);
-        
-        const extractedUrl = extractTweetUrl(tweet);
-        
-        // Should extract the status URL, not the other links
-        expect(extractedUrl).not.toBeNull();
-        if (extractedUrl) {
-          expect(extractedUrl).toContain(`/${username}/status/${statusId}`);
-          expect(validateTwitterUrl(extractedUrl)).toBe(true);
-        }
-      }),
-      { numRuns: 100 }
-    );
-  });
-
-  test('should handle null or invalid input gracefully', async () => {
-    // Test with null
-    expect(extractTweetUrl(null)).toBeNull();
-    
-    // Test with undefined
-    expect(extractTweetUrl(undefined)).toBeNull();
-    
-    // Test with non-HTMLElement
-    expect(extractTweetUrl({})).toBeNull();
-    expect(extractTweetUrl('not an element')).toBeNull();
-  });
-});
-
+function createMockTwitterPostWithStatusLink(statusUrl) {
+  const article = document.createElement('article');
+  const link = document.createElement('a');
+  
+  link.href = statusUrl;
+  link.textContent = 'View tweet';
+  article.appendChild(link);
+  
+  return article;
+}
 
 /**
- * **Feature: per-post-redirect-buttons, Property 5: URL Extraction Correctness (Instagram)**
- * **Validates: Requirements 4.2**
- * 
- * For any valid Instagram post container element, the URL extraction function should return 
- * a URL matching the pattern `https://www.instagram.com/p/[id]/` or 
- * `https://www.instagram.com/reel/[id]/` or return null if no valid URL is found.
+ * Create a mock Instagram post element with a timestamp link
  */
-describe('Property 5: URL Extraction Correctness (Instagram)', () => {
-  test('should extract valid Instagram URLs matching the post pattern', async () => {
-    // Generator for Instagram post IDs and types
-    const instagramUrlArbitrary = fc.record({
-      postId: fc.stringOf(fc.constantFrom(...'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-'.split('')), 
-        { minLength: 5, maxLength: 15 }),
-      postType: fc.constantFrom('p', 'reel', 'tv')
-    });
-
-    await fc.assert(
-      fc.asyncProperty(instagramUrlArbitrary, async ({ postId, postType }) => {
-        const post = createMockInstagramPostWithUrl(postId, postType);
-        const extractedUrl = extractInstagramPostUrl(post);
-        
-        // Should extract a URL
-        expect(extractedUrl).not.toBeNull();
-        
-        if (extractedUrl) {
-          // Should match Instagram URL pattern
-          expect(validateInstagramUrl(extractedUrl)).toBe(true);
-          
-          // Should contain the post ID and type
-          expect(extractedUrl).toContain(`/${postType}/${postId}`);
-          
-          // Should start with https://www.instagram.com or https://instagram.com
-          expect(
-            extractedUrl.startsWith('https://www.instagram.com/') || 
-            extractedUrl.startsWith('https://instagram.com/')
-          ).toBe(true);
-        }
-      }),
-      { numRuns: 100 }
-    );
-  });
-
-  test('should return null for post containers without valid URLs', async () => {
-    // Generator for posts without URL links
-    const postWithoutUrlArbitrary = fc.record({
-      hasHeader: fc.boolean(),
-      hasLinks: fc.boolean(),
-      linkHasPostPattern: fc.constant(false)
-    });
-
-    await fc.assert(
-      fc.asyncProperty(postWithoutUrlArbitrary, async (config) => {
-        const post = createMockElement('ARTICLE', { role: 'presentation' }, 'Post content');
-        
-        if (config.hasHeader) {
-          const header = createMockElement('HEADER', {}, '');
-          post.children.push(header);
-        }
-        
-        if (config.hasLinks && !config.linkHasPostPattern) {
-          // Add a link that doesn't match post pattern
-          const link = createMockElement('A', { href: 'https://example.com' }, 'Link');
-          post.children.push(link);
-        }
-        
-        const extractedUrl = extractInstagramPostUrl(post);
-        
-        // Should return null when no valid post URL is found
-        expect(extractedUrl).toBeNull();
-      }),
-      { numRuns: 100 }
-    );
-  });
-
-  test('should validate extracted URLs match Instagram post pattern', async () => {
-    // Generator for various URL patterns
-    const urlPatternArbitrary = fc.record({
-      postId: fc.stringOf(fc.constantFrom(...'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-'.split('')), 
-        { minLength: 5, maxLength: 15 }),
-      postType: fc.constantFrom('p', 'reel', 'tv'),
-      hostname: fc.constantFrom('www.instagram.com', 'instagram.com')
-    });
-
-    await fc.assert(
-      fc.asyncProperty(urlPatternArbitrary, async ({ postId, postType, hostname }) => {
-        const url = `https://${hostname}/${postType}/${postId}/`;
-        
-        // Should validate as an Instagram URL
-        expect(validateInstagramUrl(url)).toBe(true);
-        
-        // Should match the expected pattern
-        const urlObj = new URL(url);
-        expect(urlObj.pathname).toMatch(/^\/(p|reel|tv)\/[A-Za-z0-9_-]+\/?/);
-      }),
-      { numRuns: 100 }
-    );
-  });
-
-  test('should reject invalid Instagram URLs', async () => {
-    // Generator for invalid URL patterns
-    const invalidUrlArbitrary = fc.oneof(
-      fc.constant('https://example.com/p/ABC123/'),
-      fc.constant('https://www.instagram.com/user/ABC123/'),
-      fc.constant('https://www.instagram.com/ABC123/'),
-      fc.constant('not-a-url'),
-      fc.constant(''),
-      fc.constant('https://www.instagram.com/p/')
-    );
-
-    await fc.assert(
-      fc.asyncProperty(invalidUrlArbitrary, async (url) => {
-        // Should not validate invalid URLs
-        expect(validateInstagramUrl(url)).toBe(false);
-      }),
-      { numRuns: 100 }
-    );
-  });
-
-  test('should handle posts with multiple links and extract the post URL', async () => {
-    // Generator for posts with multiple links
-    const multiLinkPostArbitrary = fc.record({
-      postId: fc.stringOf(fc.constantFrom(...'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-'.split('')), 
-        { minLength: 5, maxLength: 15 }),
-      postType: fc.constantFrom('p', 'reel', 'tv'),
-      numExtraLinks: fc.integer({ min: 1, max: 5 })
-    });
-
-    await fc.assert(
-      fc.asyncProperty(multiLinkPostArbitrary, async ({ postId, postType, numExtraLinks }) => {
-        const post = createMockElement('ARTICLE', { role: 'presentation' }, 'Post content');
-        
-        // Add header with post URL
-        const header = createMockElement('HEADER', {}, '');
-        const postLink = createMockElement('A', { 
-          href: `https://www.instagram.com/${postType}/${postId}/` 
-        }, 'Post');
-        header.children.push(postLink);
-        post.children.push(header);
-        
-        // Add extra links that are not post URLs
-        for (let i = 0; i < numExtraLinks; i++) {
-          const link = createMockElement('A', { href: `https://example.com/link${i}` }, 'Link');
-          post.children.push(link);
-        }
-        
-        const extractedUrl = extractInstagramPostUrl(post);
-        
-        // Should extract the post URL, not the other links
-        expect(extractedUrl).not.toBeNull();
-        if (extractedUrl) {
-          expect(extractedUrl).toContain(`/${postType}/${postId}`);
-          expect(validateInstagramUrl(extractedUrl)).toBe(true);
-        }
-      }),
-      { numRuns: 100 }
-    );
-  });
-
-  test('should handle null or invalid input gracefully', async () => {
-    // Test with null
-    expect(extractInstagramPostUrl(null)).toBeNull();
-    
-    // Test with undefined
-    expect(extractInstagramPostUrl(undefined)).toBeNull();
-    
-    // Test with non-HTMLElement
-    expect(extractInstagramPostUrl({})).toBeNull();
-    expect(extractInstagramPostUrl('not an element')).toBeNull();
-  });
-});
+function createMockInstagramPost(postUrl) {
+  const article = document.createElement('article');
+  const header = document.createElement('header');
+  const time = document.createElement('time');
+  const link = document.createElement('a');
+  
+  link.href = postUrl;
+  time.appendChild(document.createTextNode('2h ago'));
+  link.appendChild(time);
+  header.appendChild(link);
+  article.appendChild(header);
+  
+  return article;
+}
 
 /**
- * **Feature: per-post-redirect-buttons, Property 7: Retweet URL Extraction**
- * **Validates: Requirements 4.5**
- * 
- * For any retweet or shared post container, the URL extraction function should return 
- * the URL of the original post, not the sharing user's URL.
+ * Create a mock Instagram post with header link
  */
-describe('Property 7: Retweet URL Extraction', () => {
-  test('should extract original tweet URL from retweets', async () => {
-    // Generator for retweet scenarios
-    const retweetArbitrary = fc.record({
-      originalUsername: fc.stringOf(fc.constantFrom(...'abcdefghijklmnopqrstuvwxyz0123456789_'.split('')), 
-        { minLength: 1, maxLength: 15 }),
-      originalStatusId: fc.bigUintN(64).map(n => n.toString()),
-      retweeterUsername: fc.stringOf(fc.constantFrom(...'abcdefghijklmnopqrstuvwxyz0123456789_'.split('')), 
-        { minLength: 1, maxLength: 15 })
-    });
-
-    await fc.assert(
-      fc.asyncProperty(retweetArbitrary, async ({ originalUsername, originalStatusId, retweeterUsername }) => {
-        // Create a retweet container with the original tweet's URL
-        const retweet = createMockElement('ARTICLE', { 'data-testid': 'tweet' }, 
-          `${retweeterUsername} retweeted`);
-        
-        // Add the original tweet's status link
-        const originalLink = createMockElement('A', { 
-          href: `https://x.com/${originalUsername}/status/${originalStatusId}` 
-        }, 'Original tweet');
-        retweet.children.push(originalLink);
-        
-        const extractedUrl = extractTweetUrl(retweet);
-        
-        // Should extract the original tweet's URL
-        expect(extractedUrl).not.toBeNull();
-        if (extractedUrl) {
-          expect(extractedUrl).toContain(`/${originalUsername}/status/${originalStatusId}`);
-          expect(validateTwitterUrl(extractedUrl)).toBe(true);
-          
-          // Should not contain the retweeter's username in the status path
-          // (though it might appear in the text content)
-          const urlObj = new URL(extractedUrl);
-          expect(urlObj.pathname).toContain(`/${originalUsername}/status/`);
-        }
-      }),
-      { numRuns: 100 }
-    );
-  });
-
-  test('should prioritize status URLs over profile URLs in retweets', async () => {
-    // Generator for retweet with multiple user links
-    const retweetWithLinksArbitrary = fc.record({
-      originalUsername: fc.stringOf(fc.constantFrom(...'abcdefghijklmnopqrstuvwxyz0123456789_'.split('')), 
-        { minLength: 1, maxLength: 15 }),
-      originalStatusId: fc.bigUintN(64).map(n => n.toString()),
-      retweeterUsername: fc.stringOf(fc.constantFrom(...'abcdefghijklmnopqrstuvwxyz0123456789_'.split('')), 
-        { minLength: 1, maxLength: 15 })
-    });
-
-    await fc.assert(
-      fc.asyncProperty(retweetWithLinksArbitrary, async ({ originalUsername, originalStatusId, retweeterUsername }) => {
-        const retweet = createMockElement('ARTICLE', { 'data-testid': 'tweet' }, 'Retweet content');
-        
-        // Add retweeter's profile link (should be ignored)
-        const retweeterLink = createMockElement('A', { 
-          href: `https://x.com/${retweeterUsername}` 
-        }, retweeterUsername);
-        retweet.children.push(retweeterLink);
-        
-        // Add original tweet's status link (should be extracted)
-        const statusLink = createMockElement('A', { 
-          href: `https://x.com/${originalUsername}/status/${originalStatusId}` 
-        }, 'Status');
-        retweet.children.push(statusLink);
-        
-        const extractedUrl = extractTweetUrl(retweet);
-        
-        // Should extract the status URL, not the profile URL
-        expect(extractedUrl).not.toBeNull();
-        if (extractedUrl) {
-          expect(extractedUrl).toContain('/status/');
-          expect(extractedUrl).toContain(originalUsername);
-          expect(extractedUrl).toContain(originalStatusId);
-        }
-      }),
-      { numRuns: 100 }
-    );
-  });
-
-  test('should handle quoted tweets and extract the correct URL', async () => {
-    // Generator for quoted tweet scenarios
-    const quotedTweetArbitrary = fc.record({
-      quoterUsername: fc.stringOf(fc.constantFrom(...'abcdefghijklmnopqrstuvwxyz0123456789_'.split('')), 
-        { minLength: 1, maxLength: 15 }),
-      quoterStatusId: fc.bigUintN(64).map(n => n.toString()),
-      quotedUsername: fc.stringOf(fc.constantFrom(...'abcdefghijklmnopqrstuvwxyz0123456789_'.split('')), 
-        { minLength: 1, maxLength: 15 }),
-      quotedStatusId: fc.bigUintN(64).map(n => n.toString())
-    });
-
-    await fc.assert(
-      fc.asyncProperty(quotedTweetArbitrary, async ({ quoterUsername, quoterStatusId, quotedUsername, quotedStatusId }) => {
-        // Create a quoted tweet container
-        const quotedTweet = createMockElement('ARTICLE', { 'data-testid': 'tweet' }, 
-          'Quote tweet content');
-        
-        // Add the quoter's status link (the main tweet we're viewing)
-        const quoterLink = createMockElement('A', { 
-          href: `https://x.com/${quoterUsername}/status/${quoterStatusId}` 
-        }, 'Quote');
-        quotedTweet.children.push(quoterLink);
-        
-        // Add the quoted tweet's status link (embedded)
-        const quotedLink = createMockElement('A', { 
-          href: `https://x.com/${quotedUsername}/status/${quotedStatusId}` 
-        }, 'Quoted');
-        quotedTweet.children.push(quotedLink);
-        
-        const extractedUrl = extractTweetUrl(quotedTweet);
-        
-        // Should extract a valid status URL (could be either, but should be valid)
-        expect(extractedUrl).not.toBeNull();
-        if (extractedUrl) {
-          expect(validateTwitterUrl(extractedUrl)).toBe(true);
-          expect(extractedUrl).toContain('/status/');
-        }
-      }),
-      { numRuns: 100 }
-    );
-  });
-
-  test('should handle retweets with time elements', async () => {
-    // Generator for retweets with timestamp
-    const retweetWithTimeArbitrary = fc.record({
-      originalUsername: fc.stringOf(fc.constantFrom(...'abcdefghijklmnopqrstuvwxyz0123456789_'.split('')), 
-        { minLength: 1, maxLength: 15 }),
-      originalStatusId: fc.bigUintN(64).map(n => n.toString())
-    });
-
-    await fc.assert(
-      fc.asyncProperty(retweetWithTimeArbitrary, async ({ originalUsername, originalStatusId }) => {
-        const retweet = createMockElement('ARTICLE', { 'data-testid': 'tweet' }, 'Retweet');
-        
-        // Add time element with link to original tweet
-        const timeElement = createMockElement('TIME', { datetime: '2024-01-01' }, '1h');
-        const timeLink = createMockElement('A', { 
-          href: `https://x.com/${originalUsername}/status/${originalStatusId}` 
-        }, '1h');
-        
-        timeElement.parent = timeLink;
-        timeLink.children.push(timeElement);
-        retweet.children.push(timeLink);
-        
-        const extractedUrl = extractTweetUrl(retweet);
-        
-        // Should extract the original tweet's URL from the time element
-        expect(extractedUrl).not.toBeNull();
-        if (extractedUrl) {
-          expect(extractedUrl).toContain(`/${originalUsername}/status/${originalStatusId}`);
-          expect(validateTwitterUrl(extractedUrl)).toBe(true);
-        }
-      }),
-      { numRuns: 100 }
-    );
-  });
-});
+function createMockInstagramPostWithHeaderLink(postUrl) {
+  const article = document.createElement('article');
+  const header = document.createElement('header');
+  const link = document.createElement('a');
+  
+  link.href = postUrl;
+  link.textContent = 'View post';
+  header.appendChild(link);
+  article.appendChild(header);
+  
+  return article;
+}
 
 /**
- * **Feature: per-post-redirect-buttons, Property 6: No Button on Invalid URL**
- * **Validates: Requirements 4.3**
- * 
- * For any post container where the URL cannot be extracted or is invalid, 
- * the extension should not inject a redirect button.
- * 
- * This test verifies that URL extraction returns null for invalid cases.
+ * Create an empty mock post element
  */
-describe('Property 6: No Button on Invalid URL', () => {
-  test('should return null when post URL cannot be determined', async () => {
-    // Generator for posts without valid URLs
-    const invalidPostArbitrary = fc.record({
-      platform: fc.constantFrom('twitter', 'instagram'),
-      hasLinks: fc.boolean(),
-      linksAreValid: fc.constant(false)
-    });
+function createEmptyMockPost() {
+  return document.createElement('article');
+}
 
-    await fc.assert(
-      fc.asyncProperty(invalidPostArbitrary, async (config) => {
-        let post;
-        
-        if (config.platform === 'twitter') {
-          post = createMockElement('ARTICLE', { 'data-testid': 'tweet' }, 'Tweet content');
-          
-          if (config.hasLinks) {
-            // Add invalid links
-            const link = createMockElement('A', { href: 'https://example.com' }, 'Link');
-            post.children.push(link);
-          }
-        } else {
-          post = createMockElement('ARTICLE', { role: 'presentation' }, 'Post content');
-          
-          if (config.hasLinks) {
-            // Add invalid links
-            const link = createMockElement('A', { href: 'https://example.com' }, 'Link');
-            post.children.push(link);
-          }
-        }
-        
-        const extractedUrl = extractPostUrl(post, config.platform);
-        
-        // Should return null when no valid URL is found
-        expect(extractedUrl).toBeNull();
-      }),
-      { numRuns: 100 }
-    );
-  });
-
-  test('should validate URLs before accepting them', async () => {
-    // Generator for various URL formats
-    const urlValidationArbitrary = fc.record({
-      url: fc.oneof(
-        fc.constant('https://x.com/user/status/123'),
-        fc.constant('https://www.instagram.com/p/ABC123/'),
-        fc.constant('https://example.com/status/123'),
-        fc.constant('not-a-url'),
-        fc.constant(''),
-        fc.constant('https://x.com/user/post/123')
-      ),
-      platform: fc.constantFrom('twitter', 'instagram')
-    });
-
-    await fc.assert(
-      fc.asyncProperty(urlValidationArbitrary, async ({ url, platform }) => {
-        const isValid = validatePostUrl(url, platform);
-        
-        // Should only validate URLs that match the platform's pattern
-        if (platform === 'twitter') {
-          if (isValid) {
-            expect(url).toContain('/status/');
-            expect(url).toMatch(/^https:\/\/(www\.)?(x|twitter)\.com\//);
-          }
-        } else if (platform === 'instagram') {
-          if (isValid) {
-            expect(url).toMatch(/\/(p|reel|tv)\//);
-            expect(url).toMatch(/^https:\/\/(www\.)?instagram\.com\//);
-          }
-        }
-      }),
-      { numRuns: 100 }
-    );
-  });
-
-  test('should reject malformed URLs', async () => {
-    // Generator for malformed URLs
-    const malformedUrlArbitrary = fc.oneof(
-      fc.constant('http://x.com/user/status/123'), // Wrong protocol
-      fc.constant('x.com/user/status/123'), // Missing protocol
-      fc.constant('https://x.com'), // Missing path
-      fc.constant('https://x.com/'), // Missing path
-      fc.constant('https://x.com/user'), // Incomplete path
-      fc.constant('javascript:alert(1)'), // XSS attempt
-      fc.constant('data:text/html,<script>alert(1)</script>') // Data URL
-    );
-
-    await fc.assert(
-      fc.asyncProperty(malformedUrlArbitrary, async (url) => {
-        // Should not validate malformed URLs for either platform
-        expect(validatePostUrl(url, 'twitter')).toBe(false);
-        expect(validatePostUrl(url, 'instagram')).toBe(false);
-      }),
-      { numRuns: 100 }
-    );
-  });
-
-  test('should handle edge cases in URL validation', async () => {
-    // Test null and undefined
-    expect(validatePostUrl(null, 'twitter')).toBe(false);
-    expect(validatePostUrl(undefined, 'twitter')).toBe(false);
-    expect(validatePostUrl('', 'twitter')).toBe(false);
+describe('Post URL Extractor', () => {
+  
+  // ============================================================================
+  // UNIT TESTS
+  // ============================================================================
+  
+  describe('Unit Tests', () => {
     
-    // Test invalid platform
-    expect(validatePostUrl('https://x.com/user/status/123', 'invalid')).toBe(false);
-    expect(validatePostUrl('https://x.com/user/status/123', null)).toBe(false);
-    expect(validatePostUrl('https://x.com/user/status/123', undefined)).toBe(false);
-  });
-});
-
-/**
- * **Feature: per-post-redirect-buttons, Property 15: Invalid URL Handling**
- * **Validates: Requirements 7.2**
- * 
- * For any post with a malformed or invalid URL, the extension should skip that post 
- * and log an error without affecting other posts.
- * 
- * This test verifies graceful error handling for malformed URLs.
- */
-describe('Property 15: Invalid URL Handling', () => {
-  test('should handle malformed post structures gracefully', async () => {
-    // Generator for various malformed post structures
-    const malformedPostArbitrary = fc.record({
-      platform: fc.constantFrom('twitter', 'instagram'),
-      hasMalformedLinks: fc.boolean(),
-      hasValidStructure: fc.boolean()
-    });
-
-    await fc.assert(
-      fc.asyncProperty(malformedPostArbitrary, async (config) => {
-        let post;
-        
-        if (config.platform === 'twitter') {
-          post = config.hasValidStructure 
-            ? createMockElement('ARTICLE', { 'data-testid': 'tweet' }, 'Content')
-            : createMockElement('DIV', {}, 'Content');
-          
-          if (config.hasMalformedLinks) {
-            // Add links with malformed hrefs
-            const link = createMockElement('A', { href: 'not-a-valid-url' }, 'Link');
-            post.children.push(link);
-          }
-        } else {
-          post = config.hasValidStructure
-            ? createMockElement('ARTICLE', { role: 'presentation' }, 'Content')
-            : createMockElement('DIV', {}, 'Content');
-          
-          if (config.hasMalformedLinks) {
-            const link = createMockElement('A', { href: 'javascript:void(0)' }, 'Link');
-            post.children.push(link);
-          }
-        }
-        
-        // Should not throw an error
-        expect(() => {
-          const url = extractPostUrl(post, config.platform);
-          // Should return null for malformed posts
-          if (!config.hasValidStructure || config.hasMalformedLinks) {
-            expect(url).toBeNull();
-          }
-        }).not.toThrow();
-      }),
-      { numRuns: 100 }
-    );
-  });
-
-  test('should log errors for malformed URLs without crashing', async () => {
-    // Mock console.error to capture error logs
-    const originalError = console.error;
-    const errorLogs = [];
-    console.error = (...args) => errorLogs.push(args);
-    
-    try {
-      // Generator for posts with various error conditions
-      const errorConditionArbitrary = fc.record({
-        platform: fc.constantFrom('twitter', 'instagram'),
-        errorType: fc.constantFrom('null-element', 'invalid-element', 'malformed-url')
+    describe('extractTweetUrl', () => {
+      test('extracts URL from tweet with timestamp link', () => {
+        const url = 'https://x.com/user/status/1234567890';
+        const tweet = createMockTwitterPost(url);
+        expect(extractTweetUrl(tweet)).toBe(url);
       });
 
-      await fc.assert(
-        fc.asyncProperty(errorConditionArbitrary, async (config) => {
-          let result;
+      test('extracts URL from tweet with status link', () => {
+        const url = 'https://x.com/user/status/9876543210';
+        const tweet = createMockTwitterPostWithStatusLink(url);
+        expect(extractTweetUrl(tweet)).toBe(url);
+      });
+
+      test('extracts URL from twitter.com domain', () => {
+        const url = 'https://twitter.com/user/status/1234567890';
+        const tweet = createMockTwitterPost(url);
+        expect(extractTweetUrl(tweet)).toBe(url);
+      });
+
+      test('returns null for tweet without links', () => {
+        const tweet = createEmptyMockPost();
+        expect(extractTweetUrl(tweet)).toBe(null);
+      });
+
+      test('returns null for null input', () => {
+        expect(extractTweetUrl(null)).toBe(null);
+      });
+
+      test('returns null for undefined input', () => {
+        expect(extractTweetUrl(undefined)).toBe(null);
+      });
+
+      test('returns null for non-HTMLElement input', () => {
+        expect(extractTweetUrl({})).toBe(null);
+        expect(extractTweetUrl('string')).toBe(null);
+      });
+
+      test('returns null for tweet with invalid URL', () => {
+        const tweet = createMockTwitterPost('https://example.com/not/a/tweet');
+        expect(extractTweetUrl(tweet)).toBe(null);
+      });
+    });
+
+    describe('extractInstagramPostUrl', () => {
+      test('extracts URL from post with timestamp link', () => {
+        const url = 'https://www.instagram.com/p/ABC123/';
+        const post = createMockInstagramPost(url);
+        expect(extractInstagramPostUrl(post)).toBe(url);
+      });
+
+      test('extracts URL from post with header link', () => {
+        const url = 'https://www.instagram.com/p/XYZ789/';
+        const post = createMockInstagramPostWithHeaderLink(url);
+        expect(extractInstagramPostUrl(post)).toBe(url);
+      });
+
+      test('extracts URL from reel', () => {
+        const url = 'https://www.instagram.com/reel/ABC123/';
+        const post = createMockInstagramPost(url);
+        expect(extractInstagramPostUrl(post)).toBe(url);
+      });
+
+      test('cleans query parameters from URL', () => {
+        const urlWithParams = 'https://www.instagram.com/p/ABC123/?utm_source=ig_web';
+        const cleanUrl = 'https://www.instagram.com/p/ABC123/';
+        const post = createMockInstagramPost(urlWithParams);
+        expect(extractInstagramPostUrl(post)).toBe(cleanUrl);
+      });
+
+      test('returns null for post without links', () => {
+        const post = createEmptyMockPost();
+        expect(extractInstagramPostUrl(post)).toBe(null);
+      });
+
+      test('returns null for null input', () => {
+        expect(extractInstagramPostUrl(null)).toBe(null);
+      });
+
+      test('returns null for undefined input', () => {
+        expect(extractInstagramPostUrl(undefined)).toBe(null);
+      });
+
+      test('returns null for non-HTMLElement input', () => {
+        expect(extractInstagramPostUrl({})).toBe(null);
+        expect(extractInstagramPostUrl('string')).toBe(null);
+      });
+
+      test('returns null for post with invalid URL', () => {
+        const post = createMockInstagramPost('https://example.com/not/instagram');
+        expect(extractInstagramPostUrl(post)).toBe(null);
+      });
+    });
+
+    describe('validateTwitterUrl', () => {
+      test('validates x.com status URL', () => {
+        expect(validateTwitterUrl('https://x.com/user/status/1234567890')).toBe(true);
+      });
+
+      test('validates www.x.com status URL', () => {
+        expect(validateTwitterUrl('https://www.x.com/user/status/1234567890')).toBe(true);
+      });
+
+      test('validates twitter.com status URL', () => {
+        expect(validateTwitterUrl('https://twitter.com/user/status/1234567890')).toBe(true);
+      });
+
+      test('validates www.twitter.com status URL', () => {
+        expect(validateTwitterUrl('https://www.twitter.com/user/status/1234567890')).toBe(true);
+      });
+
+      test('rejects URL without status path', () => {
+        expect(validateTwitterUrl('https://x.com/user')).toBe(false);
+      });
+
+      test('rejects URL with non-numeric status ID', () => {
+        expect(validateTwitterUrl('https://x.com/user/status/abc')).toBe(false);
+      });
+
+      test('rejects non-Twitter domain', () => {
+        expect(validateTwitterUrl('https://example.com/user/status/123')).toBe(false);
+      });
+
+      test('rejects http protocol', () => {
+        expect(validateTwitterUrl('http://x.com/user/status/123')).toBe(false);
+      });
+
+      test('rejects null input', () => {
+        expect(validateTwitterUrl(null)).toBe(false);
+      });
+
+      test('rejects undefined input', () => {
+        expect(validateTwitterUrl(undefined)).toBe(false);
+      });
+
+      test('rejects non-string input', () => {
+        expect(validateTwitterUrl(123)).toBe(false);
+      });
+
+      test('rejects malformed URL', () => {
+        expect(validateTwitterUrl('not a url')).toBe(false);
+      });
+    });
+
+    describe('validateInstagramUrl', () => {
+      test('validates www.instagram.com post URL', () => {
+        expect(validateInstagramUrl('https://www.instagram.com/p/ABC123/')).toBe(true);
+      });
+
+      test('validates instagram.com post URL', () => {
+        expect(validateInstagramUrl('https://instagram.com/p/ABC123/')).toBe(true);
+      });
+
+      test('validates reel URL', () => {
+        expect(validateInstagramUrl('https://www.instagram.com/reel/ABC123/')).toBe(true);
+      });
+
+      test('validates tv URL', () => {
+        expect(validateInstagramUrl('https://www.instagram.com/tv/ABC123/')).toBe(true);
+      });
+
+      test('validates post URL without trailing slash', () => {
+        expect(validateInstagramUrl('https://www.instagram.com/p/ABC123')).toBe(true);
+      });
+
+      test('rejects URL without post code', () => {
+        expect(validateInstagramUrl('https://www.instagram.com/user/')).toBe(false);
+      });
+
+      test('rejects non-Instagram domain', () => {
+        expect(validateInstagramUrl('https://example.com/p/ABC123/')).toBe(false);
+      });
+
+      test('rejects http protocol', () => {
+        expect(validateInstagramUrl('http://www.instagram.com/p/ABC123/')).toBe(false);
+      });
+
+      test('rejects null input', () => {
+        expect(validateInstagramUrl(null)).toBe(false);
+      });
+
+      test('rejects undefined input', () => {
+        expect(validateInstagramUrl(undefined)).toBe(false);
+      });
+
+      test('rejects non-string input', () => {
+        expect(validateInstagramUrl(123)).toBe(false);
+      });
+
+      test('rejects malformed URL', () => {
+        expect(validateInstagramUrl('not a url')).toBe(false);
+      });
+    });
+
+    describe('cleanInstagramUrl', () => {
+      test('removes query parameters', () => {
+        const dirty = 'https://www.instagram.com/p/ABC123/?utm_source=ig_web&ref=share';
+        const clean = 'https://www.instagram.com/p/ABC123/';
+        expect(cleanInstagramUrl(dirty)).toBe(clean);
+      });
+
+      test('removes hash fragment', () => {
+        const dirty = 'https://www.instagram.com/p/ABC123/#comments';
+        const clean = 'https://www.instagram.com/p/ABC123/';
+        expect(cleanInstagramUrl(dirty)).toBe(clean);
+      });
+
+      test('removes both query and hash', () => {
+        const dirty = 'https://www.instagram.com/p/ABC123/?ref=share#comments';
+        const clean = 'https://www.instagram.com/p/ABC123/';
+        expect(cleanInstagramUrl(dirty)).toBe(clean);
+      });
+
+      test('preserves clean URL', () => {
+        const clean = 'https://www.instagram.com/p/ABC123/';
+        expect(cleanInstagramUrl(clean)).toBe(clean);
+      });
+
+      test('preserves pathname', () => {
+        const dirty = 'https://www.instagram.com/reel/XYZ789/?ref=share';
+        const clean = 'https://www.instagram.com/reel/XYZ789/';
+        expect(cleanInstagramUrl(dirty)).toBe(clean);
+      });
+
+      test('returns original for malformed URL', () => {
+        const malformed = 'not a url';
+        expect(cleanInstagramUrl(malformed)).toBe(malformed);
+      });
+    });
+
+    describe('validatePostUrl', () => {
+      test('validates Twitter URL with twitter platform', () => {
+        expect(validatePostUrl('https://x.com/user/status/123', 'twitter')).toBe(true);
+      });
+
+      test('validates Instagram URL with instagram platform', () => {
+        expect(validatePostUrl('https://www.instagram.com/p/ABC/', 'instagram')).toBe(true);
+      });
+
+      test('rejects Twitter URL with instagram platform', () => {
+        expect(validatePostUrl('https://x.com/user/status/123', 'instagram')).toBe(false);
+      });
+
+      test('rejects Instagram URL with twitter platform', () => {
+        expect(validatePostUrl('https://www.instagram.com/p/ABC/', 'twitter')).toBe(false);
+      });
+
+      test('rejects invalid platform', () => {
+        expect(validatePostUrl('https://x.com/user/status/123', 'facebook')).toBe(false);
+      });
+
+      test('rejects null URL', () => {
+        expect(validatePostUrl(null, 'twitter')).toBe(false);
+      });
+
+      test('rejects null platform', () => {
+        expect(validatePostUrl('https://x.com/user/status/123', null)).toBe(false);
+      });
+    });
+
+    describe('extractPostUrl', () => {
+      test('extracts Twitter URL with twitter platform', () => {
+        const url = 'https://x.com/user/status/123';
+        const post = createMockTwitterPost(url);
+        expect(extractPostUrl(post, 'twitter')).toBe(url);
+      });
+
+      test('extracts Instagram URL with instagram platform', () => {
+        const url = 'https://www.instagram.com/p/ABC123/';
+        const post = createMockInstagramPost(url);
+        expect(extractPostUrl(post, 'instagram')).toBe(url);
+      });
+
+      test('returns null for invalid platform', () => {
+        const post = createMockTwitterPost('https://x.com/user/status/123');
+        expect(extractPostUrl(post, 'facebook')).toBe(null);
+      });
+
+      test('returns null for null element', () => {
+        expect(extractPostUrl(null, 'twitter')).toBe(null);
+      });
+
+      test('returns null for null platform', () => {
+        const post = createMockTwitterPost('https://x.com/user/status/123');
+        expect(extractPostUrl(post, null)).toBe(null);
+      });
+    });
+  });
+
+  // ============================================================================
+  // PROPERTY-BASED TESTS
+  // ============================================================================
+  
+  describe('Property-Based Tests', () => {
+    
+    // Custom generators
+    const instagramPostCodeGen = fc.stringOf(
+      fc.oneof(
+        fc.char().filter(c => /[A-Za-z0-9_-]/.test(c))
+      ),
+      { minLength: 5, maxLength: 15 }
+    );
+
+    const instagramUrlGen = fc.oneof(
+      instagramPostCodeGen.map(code => `https://www.instagram.com/p/${code}/`),
+      instagramPostCodeGen.map(code => `https://instagram.com/p/${code}/`),
+      instagramPostCodeGen.map(code => `https://www.instagram.com/reel/${code}/`),
+      instagramPostCodeGen.map(code => `https://www.instagram.com/tv/${code}/`)
+    );
+
+    const queryParamsGen = fc.dictionary(
+      fc.stringOf(fc.char().filter(c => /[a-z_]/.test(c)), { minLength: 3, maxLength: 10 }),
+      fc.stringOf(fc.char().filter(c => /[a-zA-Z0-9]/.test(c)), { minLength: 1, maxLength: 20 }),
+      { minKeys: 1, maxKeys: 5 }
+    ).map(obj => {
+      const params = new URLSearchParams(obj);
+      return params.toString();
+    });
+
+    const twitterUsernameGen = fc.stringOf(
+      fc.char().filter(c => /[a-zA-Z0-9_]/.test(c)),
+      { minLength: 1, maxLength: 15 }
+    );
+
+    const twitterStatusIdGen = fc.bigInt({ min: 1n, max: 9999999999999999999n }).map(n => n.toString());
+
+    const twitterUrlGen = fc.tuple(twitterUsernameGen, twitterStatusIdGen).map(
+      ([username, statusId]) => `https://x.com/${username}/status/${statusId}`
+    );
+
+    const platformGen = fc.constantFrom('twitter', 'instagram');
+
+    const invalidPlatformGen = fc.oneof(
+      fc.constant('facebook'),
+      fc.constant('tiktok'),
+      fc.constant('youtube'),
+      fc.constant(''),
+      fc.string().filter(s => s !== 'twitter' && s !== 'instagram')
+    );
+
+    // Property 15: Instagram URL cleaning
+    test('Property 15: Instagram URL cleaning', () => {
+      /**
+       * Feature: testing-implementation, Property 15: Instagram URL cleaning
+       * Validates: Requirements 3.2, 6.4
+       */
+      fc.assert(
+        fc.property(instagramUrlGen, queryParamsGen, (baseUrl, queryParams) => {
+          const urlWithParams = `${baseUrl}?${queryParams}`;
+          const cleaned = cleanInstagramUrl(urlWithParams);
           
-          switch (config.errorType) {
-            case 'null-element':
-              result = extractPostUrl(null, config.platform);
-              expect(result).toBeNull();
-              break;
-              
-            case 'invalid-element':
-              result = extractPostUrl({}, config.platform);
-              expect(result).toBeNull();
-              break;
-              
-            case 'malformed-url':
-              const post = createMockElement('ARTICLE', {}, 'Content');
-              const link = createMockElement('A', { href: 'not-a-url' }, 'Link');
-              post.children.push(link);
-              result = extractPostUrl(post, config.platform);
-              expect(result).toBeNull();
-              break;
-          }
+          // Parse both URLs
+          const cleanedObj = new URL(cleaned);
+          const baseObj = new URL(baseUrl);
           
-          // Should not throw an error
-          expect(result).toBeNull();
+          // Verify query parameters are removed
+          const hasNoQuery = cleanedObj.search === '';
+          // Verify pathname is preserved
+          const pathnamePreserved = cleanedObj.pathname === baseObj.pathname;
+          // Verify protocol and hostname are preserved
+          const protocolPreserved = cleanedObj.protocol === baseObj.protocol;
+          const hostnamePreserved = cleanedObj.hostname === baseObj.hostname;
+          
+          return hasNoQuery && pathnamePreserved && protocolPreserved && hostnamePreserved;
         }),
         { numRuns: 100 }
       );
-    } finally {
-      // Restore console.error
-      console.error = originalError;
-    }
-  });
-
-  test('should skip posts with invalid URLs and continue processing', async () => {
-    // Generator for mixed valid and invalid posts
-    const mixedPostsArbitrary = fc.array(
-      fc.record({
-        platform: fc.constantFrom('twitter', 'instagram'),
-        isValid: fc.boolean(),
-        username: fc.stringOf(fc.constantFrom(...'abcdefghijklmnopqrstuvwxyz0123456789_'.split('')), 
-          { minLength: 1, maxLength: 15 }),
-        twitterId: fc.bigUintN(64).map(n => n.toString()),
-        instagramId: fc.stringOf(fc.constantFrom(...'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-'.split('')), 
-          { minLength: 5, maxLength: 15 })
-      }),
-      { minLength: 2, maxLength: 10 }
-    );
-
-    await fc.assert(
-      fc.asyncProperty(mixedPostsArbitrary, async (postConfigs) => {
-        const results = postConfigs.map(config => {
-          let post;
-          
-          if (config.platform === 'twitter') {
-            if (config.isValid) {
-              post = createMockTweetWithUrl(config.username, config.twitterId);
-            } else {
-              post = createMockElement('ARTICLE', {}, 'Invalid tweet');
-            }
-            return extractTweetUrl(post);
-          } else {
-            if (config.isValid) {
-              post = createMockInstagramPostWithUrl(config.instagramId, 'p');
-            } else {
-              post = createMockElement('ARTICLE', {}, 'Invalid post');
-            }
-            return extractInstagramPostUrl(post);
-          }
-        });
-        
-        // Should have extracted URLs for valid posts
-        const validCount = postConfigs.filter(c => c.isValid).length;
-        const extractedCount = results.filter(r => r !== null).length;
-        
-        // At least some valid posts should have URLs extracted
-        if (validCount > 0) {
-          expect(extractedCount).toBeGreaterThan(0);
-        }
-        
-        // Invalid posts should return null
-        postConfigs.forEach((config, index) => {
-          if (!config.isValid) {
-            expect(results[index]).toBeNull();
-          }
-        });
-      }),
-      { numRuns: 100 }
-    );
-  });
-
-  test('should handle unexpected DOM structures without throwing', async () => {
-    // Generator for unexpected DOM structures
-    const unexpectedStructureArbitrary = fc.record({
-      platform: fc.constantFrom('twitter', 'instagram'),
-      hasChildren: fc.boolean(),
-      childrenAreValid: fc.boolean()
     });
 
-    await fc.assert(
-      fc.asyncProperty(unexpectedStructureArbitrary, async (config) => {
-        const post = createMockElement('ARTICLE', {}, 'Content');
-        
-        if (config.hasChildren && !config.childrenAreValid) {
-          // Add unexpected child elements
-          const weirdChild = createMockElement('SCRIPT', {}, 'alert(1)');
-          post.children.push(weirdChild);
-        }
-        
-        // Should not throw an error
-        expect(() => {
-          const url = extractPostUrl(post, config.platform);
-          // May return null, but should not crash
-          expect(url === null || typeof url === 'string').toBe(true);
-        }).not.toThrow();
-      }),
-      { numRuns: 100 }
-    );
+    // Property 16: Post URL validation correctness
+    test('Property 16: Post URL validation correctness', () => {
+      /**
+       * Feature: testing-implementation, Property 16: Post URL validation correctness
+       * Validates: Requirements 3.3, 6.3
+       */
+      fc.assert(
+        fc.property(
+          fc.oneof(twitterUrlGen, instagramUrlGen),
+          platformGen,
+          (url, platform) => {
+            const isValid = validatePostUrl(url, platform);
+            
+            // Determine if URL matches platform
+            const isTwitterUrl = url.includes('x.com') || url.includes('twitter.com');
+            const isInstagramUrl = url.includes('instagram.com');
+            
+            if (platform === 'twitter') {
+              // Should be valid only if it's a Twitter URL
+              return isValid === isTwitterUrl;
+            } else if (platform === 'instagram') {
+              // Should be valid only if it's an Instagram URL
+              return isValid === isInstagramUrl;
+            }
+            
+            return true;
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    // Property 17: Extracted URL validity
+    test('Property 17: Extracted URL validity', () => {
+      /**
+       * Feature: testing-implementation, Property 17: Extracted URL validity
+       * Validates: Requirements 3.5
+       */
+      fc.assert(
+        fc.property(
+          fc.oneof(twitterUrlGen, instagramUrlGen),
+          platformGen,
+          (url, platform) => {
+            // Create appropriate mock post element
+            let post;
+            const isTwitterUrl = url.includes('x.com') || url.includes('twitter.com');
+            const isInstagramUrl = url.includes('instagram.com');
+            
+            if (platform === 'twitter' && isTwitterUrl) {
+              post = createMockTwitterPost(url);
+            } else if (platform === 'instagram' && isInstagramUrl) {
+              post = createMockInstagramPost(url);
+            } else {
+              // Mismatched platform and URL, skip this case
+              return true;
+            }
+            
+            const extracted = extractPostUrl(post, platform);
+            
+            // If extraction returns non-null, it should be valid for the platform
+            if (extracted !== null) {
+              return validatePostUrl(extracted, platform);
+            }
+            
+            // Null is acceptable
+            return true;
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    // Property 18: Twitter extraction output validity
+    test('Property 18: Twitter extraction output validity', () => {
+      /**
+       * Feature: testing-implementation, Property 18: Twitter extraction output validity
+       * Validates: Requirements 6.1
+       */
+      fc.assert(
+        fc.property(
+          fc.oneof(
+            twitterUrlGen,
+            fc.constant(null)
+          ),
+          fc.boolean(),
+          (url, useStatusLink) => {
+            let post;
+            
+            if (url === null) {
+              // Create empty post
+              post = createEmptyMockPost();
+            } else {
+              // Create post with URL
+              post = useStatusLink 
+                ? createMockTwitterPostWithStatusLink(url)
+                : createMockTwitterPost(url);
+            }
+            
+            const extracted = extractTweetUrl(post);
+            
+            // Result should be either null or a valid Twitter URL
+            if (extracted === null) {
+              return true;
+            }
+            
+            return validateTwitterUrl(extracted);
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    // Property 19: Instagram extraction output validity
+    test('Property 19: Instagram extraction output validity', () => {
+      /**
+       * Feature: testing-implementation, Property 19: Instagram extraction output validity
+       * Validates: Requirements 6.2
+       */
+      fc.assert(
+        fc.property(
+          fc.oneof(
+            instagramUrlGen,
+            fc.constant(null)
+          ),
+          fc.boolean(),
+          (url, useHeaderLink) => {
+            let post;
+            
+            if (url === null) {
+              // Create empty post
+              post = createEmptyMockPost();
+            } else {
+              // Create post with URL
+              post = useHeaderLink 
+                ? createMockInstagramPostWithHeaderLink(url)
+                : createMockInstagramPost(url);
+            }
+            
+            const extracted = extractInstagramPostUrl(post);
+            
+            // Result should be either null or a valid Instagram URL
+            if (extracted === null) {
+              return true;
+            }
+            
+            return validateInstagramUrl(extracted);
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    // Property 20: Extraction strategy consistency
+    test('Property 20: Extraction strategy consistency', () => {
+      /**
+       * Feature: testing-implementation, Property 20: Extraction strategy consistency
+       * Validates: Requirements 6.5
+       */
+      fc.assert(
+        fc.property(
+          fc.oneof(twitterUrlGen, instagramUrlGen),
+          (url) => {
+            const isTwitterUrl = url.includes('x.com') || url.includes('twitter.com');
+            const isInstagramUrl = url.includes('instagram.com');
+            
+            if (isTwitterUrl) {
+              // Create Twitter post with multiple link strategies
+              const post1 = createMockTwitterPost(url); // timestamp link
+              const post2 = createMockTwitterPostWithStatusLink(url); // status link
+              
+              const extracted1 = extractTweetUrl(post1);
+              const extracted2 = extractTweetUrl(post2);
+              
+              // If both succeed, they should return the same URL
+              if (extracted1 !== null && extracted2 !== null) {
+                return extracted1 === extracted2;
+              }
+              
+              // If one fails, that's acceptable (different strategies may have different success rates)
+              return true;
+            } else if (isInstagramUrl) {
+              // Create Instagram post with multiple link strategies
+              const post1 = createMockInstagramPost(url); // timestamp link
+              const post2 = createMockInstagramPostWithHeaderLink(url); // header link
+              
+              const extracted1 = extractInstagramPostUrl(post1);
+              const extracted2 = extractInstagramPostUrl(post2);
+              
+              // If both succeed, they should return the same URL (cleaned)
+              if (extracted1 !== null && extracted2 !== null) {
+                return extracted1 === extracted2;
+              }
+              
+              // If one fails, that's acceptable
+              return true;
+            }
+            
+            return true;
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
   });
 });

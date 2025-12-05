@@ -1,131 +1,79 @@
 /**
- * Error logging utilities for Embed Link Helper
- * Provides consistent logging across the extension
+ * Logger utility that respects debug logging settings
  */
 
-const LOG_PREFIX = '[Social Redirector]';
-
-/**
- * Log levels
- */
-const LogLevel = {
-  ERROR: 'error',
-  WARN: 'warn',
-  INFO: 'info',
-  DEBUG: 'debug'
-};
+let debugEnabled = false;
 
 /**
- * Log an error message
- * @param {string} context - The context where the error occurred
- * @param {string} message - The error message
- * @param {Error|any} error - Optional error object or additional data
+ * Initialize logger with config
+ * @param {Object} config - Configuration object
  */
-function logError(context, message, error) {
-  const fullMessage = `${LOG_PREFIX} [${context}] ${message}`;
-  if (error) {
-    console.error(fullMessage, error);
+async function initLogger(config) {
+  if (config && config.debugLogging !== undefined) {
+    debugEnabled = config.debugLogging;
   } else {
-    console.error(fullMessage);
+    // If config is missing or debugLogging is undefined, default to false
+    debugEnabled = false;
   }
 }
 
 /**
- * Log a warning message
- * @param {string} context - The context where the warning occurred
- * @param {string} message - The warning message
- * @param {any} data - Optional additional data
+ * Update debug logging state
+ * @param {boolean} enabled - Whether debug logging is enabled
  */
-function logWarn(context, message, data) {
-  const fullMessage = `${LOG_PREFIX} [${context}] ${message}`;
-  if (data) {
-    console.warn(fullMessage, data);
-  } else {
-    console.warn(fullMessage);
+function setDebugLogging(enabled) {
+  debugEnabled = enabled;
+}
+
+/**
+ * Log message if debug logging is enabled
+ * @param {string} message - Message to log
+ * @param {...any} args - Additional arguments
+ */
+function log(message, ...args) {
+  if (debugEnabled) {
+    console.log(message, ...args);
   }
 }
 
 /**
- * Log an info message
- * @param {string} context - The context
- * @param {string} message - The info message
- * @param {any} data - Optional additional data
+ * Log warning if debug logging is enabled
+ * @param {string} message - Warning message
+ * @param {...any} args - Additional arguments
  */
-function logInfo(context, message, data) {
-  const fullMessage = `${LOG_PREFIX} [${context}] ${message}`;
-  if (data) {
-    console.info(fullMessage, data);
-  } else {
-    console.info(fullMessage);
+function warn(message, ...args) {
+  if (debugEnabled) {
+    console.warn(message, ...args);
   }
 }
 
 /**
- * Log a debug message
- * @param {string} context - The context
- * @param {string} message - The debug message
- * @param {any} data - Optional additional data
+ * Log error (always logged regardless of debug setting)
+ * @param {string} message - Error message
+ * @param {...any} args - Additional arguments
  */
-function logDebug(context, message, data) {
-  const fullMessage = `${LOG_PREFIX} [${context}] ${message}`;
-  if (data) {
-    console.debug(fullMessage, data);
-  } else {
-    console.debug(fullMessage);
-  }
-}
-
-/**
- * Log a storage error with specific handling
- * Requirement: 6.3
- * @param {string} operation - The storage operation that failed
- * @param {Error} error - The error object
- */
-function logStorageError(operation, error) {
-  logError('Storage', `Failed to ${operation}`, error);
-}
-
-/**
- * Log a URL transformation error
- * Requirement: 7.1, 7.2
- * @param {string} url - The URL that failed to transform
- * @param {Error} error - The error object
- */
-function logUrlTransformError(url, error) {
-  logError('URL Transform', `Failed to transform URL: ${url}`, error);
-}
-
-/**
- * Log a configuration error
- * Requirement: 6.3, 6.5
- * @param {string} message - The error message
- * @param {any} data - Optional additional data
- */
-function logConfigError(message, data) {
-  logError('Config', message, data);
-}
-
-/**
- * Log a DOM manipulation error
- * Requirement: 5.1, 5.3
- * @param {string} operation - The DOM operation that failed
- * @param {Error} error - The error object
- */
-function logDomError(operation, error) {
-  logError('DOM', `Failed to ${operation}`, error);
+function error(message, ...args) {
+  console.error(message, ...args);
 }
 
 // Export functions
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
-    LogLevel,
-    logError,
-    logWarn,
-    logInfo,
-    logDebug,
-    logStorageError,
-    logUrlTransformError,
-    logConfigError,
-    logDomError
+    initLogger,
+    setDebugLogging,
+    log,
+    warn,
+    error
+  };
+}
+
+// Expose to window for browser extension content scripts
+if (typeof window !== 'undefined') {
+  window.Logger = {
+    initLogger,
+    setDebugLogging,
+    log,
+    warn,
+    error
   };
 }
