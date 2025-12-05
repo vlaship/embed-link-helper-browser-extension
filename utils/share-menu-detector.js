@@ -1,7 +1,6 @@
 /**
  * Share Menu Detector Module
  * Detects share menu appearance and identifies associated posts
- * Requirements: 1.1, 2.1, 3.2, 6.1, 6.2
  */
 
 /**

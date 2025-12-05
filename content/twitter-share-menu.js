@@ -1,7 +1,6 @@
 /**
  * Twitter/X Share Menu Integration
  * Injects "Copy embed link" into native share menus
- * Requirements: 1.1, 1.3, 1.4, 1.5, 1.6, 4.1, 4.3, 4.4
  */
 
 // Import utilities (these are loaded via manifest)

@@ -1,7 +1,6 @@
 /**
  * Share Menu Injector Module
  * Creates and injects custom menu items into share menus
- * Requirements: 1.1, 1.2, 2.1, 2.2, 6.1
  */
 
 /**

@@ -1,6 +1,5 @@
 /**
  * Shared DOM manipulation utilities for Embed Link Helper
- * Requirements: 5.1, 5.2, 5.3
  */
 
 /**
@@ -28,7 +27,6 @@ function removeElement(elementId) {
 
 /**
  * Create a redirect button element with shared styling
- * Requirements: 5.1, 5.2, 5.3, 5.4
  * @param {Object} options - Button configuration
  * @param {string} options.id - Button element ID
  * @param {string} options.platform - Platform name ('twitter' or 'instagram')
@@ -55,7 +53,6 @@ function createRedirectButton(options) {
 
 /**
  * Inject a button into the page body
- * Requirements: 5.3
  * @param {HTMLElement} button - The button element to inject
  * @returns {boolean} True if injection was successful
  */
@@ -75,7 +72,6 @@ function injectButton(button) {
 
 /**
  * Set up a MutationObserver to detect URL changes in SPAs
- * Requirements: 5.5
  * @param {Function} callback - Function to call when URL changes
  * @returns {MutationObserver} The created observer
  */
