@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Embed Link Helper",
-  "version": "1.0.1",
+  "version": "1.0.7",
   "description": "Integrates with Twitter/X and Instagram share menus to copy transformed links for better previews in messaging platforms",
   "permissions": [
     "storage",
@@ -29,14 +29,16 @@
         "*://x.com/*"
       ],
       "js": [
+        "config/config.js",
         "utils/logger.js",
-        "utils/dom-utils.js",
         "utils/post-detector.js",
         "utils/post-url-extractor.js",
         "utils/url-transformer.js",
         "utils/share-menu-detector.js",
         "utils/share-menu-injector.js",
         "utils/feedback-manager.js",
+        "utils/clipboard-manager.js",
+        "utils/share-menu-integration.js",
         "content/twitter-share-menu.js"
       ],
       "run_at": "document_idle"
@@ -46,14 +48,16 @@
         "*://www.instagram.com/*"
       ],
       "js": [
+        "config/config.js",
         "utils/logger.js",
-        "utils/dom-utils.js",
         "utils/post-detector.js",
         "utils/post-url-extractor.js",
         "utils/url-transformer.js",
         "utils/share-menu-detector.js",
         "utils/share-menu-injector.js",
         "utils/feedback-manager.js",
+        "utils/clipboard-manager.js",
+        "utils/share-menu-integration.js",
         "content/instagram-share-menu.js"
       ],
       "run_at": "document_idle"

@@ -28,7 +28,7 @@ function createEmbedLinkMenuItem(postUrl, targetHostname, platform) {
 
   try {
     // Generate unique item ID
-    const itemId = `embed-link-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const itemId = `embed-link-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
     
     let menuItem;
 

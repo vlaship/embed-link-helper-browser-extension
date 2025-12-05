@@ -196,5 +196,16 @@ if (typeof module !== 'undefined' && module.exports) {
     saveConfig,
     clearConfig
   };
+} else if (typeof window !== 'undefined') {
+  // Browser environment - expose to window object
+  window.Config = {
+    DEFAULT_CONFIG,
+    getDefaultConfig,
+    validateHostname,
+    validateConfig,
+    getConfig,
+    saveConfig,
+    clearConfig
+  };
 }
 
