@@ -109,8 +109,9 @@ function validateConfig(config) {
  */
 async function getConfig() {
   try {
-    // Use browser namespace (provided by polyfill in Chrome, native in Firefox)
-    const result = await browser.storage.sync.get('config');
+    // Use chrome or browser namespace (Chrome MV3 uses chrome, Firefox uses browser)
+    const storageApi = (typeof chrome !== 'undefined' && chrome.storage) ? chrome.storage : browser.storage;
+    const result = await storageApi.sync.get('config');
     
     // If no config in storage, return default
     if (!result.config) {
@@ -163,8 +164,9 @@ async function saveConfig(config) {
   }
 
   try {
-    // Use browser namespace (provided by polyfill in Chrome, native in Firefox)
-    await browser.storage.sync.set({ config });
+    // Use chrome or browser namespace (Chrome MV3 uses chrome, Firefox uses browser)
+    const storageApi = (typeof chrome !== 'undefined' && chrome.storage) ? chrome.storage : browser.storage;
+    await storageApi.sync.set({ config });
   } catch (error) {
     console.error('Error saving config to storage:', error);
     throw new Error(`Failed to save configuration: ${error.message}`);
@@ -177,7 +179,9 @@ async function saveConfig(config) {
  */
 async function clearConfig() {
   try {
-    await browser.storage.sync.remove('config');
+    // Use chrome or browser namespace (Chrome MV3 uses chrome, Firefox uses browser)
+    const storageApi = (typeof chrome !== 'undefined' && chrome.storage) ? chrome.storage : browser.storage;
+    await storageApi.sync.remove('config');
   } catch (error) {
     console.error('Error clearing config from storage:', error);
     throw new Error(`Failed to clear configuration: ${error.message}`);

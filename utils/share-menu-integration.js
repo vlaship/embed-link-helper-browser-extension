@@ -117,14 +117,14 @@ async function initializeShareMenuIntegration(config) {
       
       // Add click handler
       menuItem.addEventListener('click', (event) => {
-        handleMenuItemClick(event, postUrl, targetHostname);
+        handleMenuItemClick(event, postUrl);
       });
       
       // Add keyboard handler for accessibility
       menuItem.addEventListener('keydown', (event) => {
         if (event.key === 'Enter' || event.key === ' ') {
           event.preventDefault();
-          handleMenuItemClick(event, postUrl, targetHostname);
+          handleMenuItemClick(event, postUrl);
         }
       });
       
@@ -145,14 +145,19 @@ async function initializeShareMenuIntegration(config) {
    * Handle menu item click
    * @param {Event} event - The click event
    * @param {string} postUrl - The original post URL
-   * @param {string} targetHostname - The target hostname for transformation
    */
-  async function handleMenuItemClick(event, postUrl, targetHostname) {
+  async function handleMenuItemClick(event, postUrl) {
     window.Logger.log(`[${platform}-share-menu] Menu item clicked`);
     
     const menuItem = event.currentTarget;
     
     try {
+      // Fetch fresh config to ensure we have the latest prefix
+      const freshConfig = await getConfig();
+      console.log(`[${platform}-share-menu] Fresh config loaded:`, freshConfig);
+      const targetHostname = freshConfig[platformKey].targetHostname;
+      console.log(`[${platform}-share-menu] Using targetHostname:`, targetHostname);
+      
       // Transform URL
       const transformedUrl = window.UrlTransformer.transformUrl(postUrl, targetHostname);
       
@@ -263,7 +268,8 @@ async function initializeShareMenuIntegration(config) {
     observer = window.ShareMenuDetector.observeShareMenus(platform, handleShareMenuDetected);
     
     // Listen for configuration updates
-    browser.storage.onChanged.addListener(handleConfigUpdate);
+    const storageApi = (typeof chrome !== 'undefined' && chrome.storage) ? chrome.storage : browser.storage;
+    storageApi.onChanged.addListener(handleConfigUpdate);
     
     window.Logger.log(`[${platform}-share-menu] Initialization complete`);
     
@@ -274,7 +280,8 @@ async function initializeShareMenuIntegration(config) {
           observer.disconnect();
           observer = null;
         }
-        browser.storage.onChanged.removeListener(handleConfigUpdate);
+        const storageApi = (typeof chrome !== 'undefined' && chrome.storage) ? chrome.storage : browser.storage;
+        storageApi.onChanged.removeListener(handleConfigUpdate);
       },
       isActive: () => observer !== null
     };

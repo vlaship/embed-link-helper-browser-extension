@@ -8,6 +8,7 @@ let instagramInput;
 let debugLoggingCheckbox;
 let saveButton;
 let errorMessage;
+let versionElement;
 
 /**
  * Initialize popup when DOM is loaded
@@ -19,6 +20,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   debugLoggingCheckbox = document.getElementById('debug-logging');
   saveButton = document.getElementById('save-button');
   errorMessage = document.getElementById('error-message');
+  versionElement = document.getElementById('version');
+
+  // Display version
+  const manifest = browser.runtime.getManifest();
+  if (versionElement && manifest.version) {
+    versionElement.textContent = `v${manifest.version}`;
+  }
 
   // Load current configuration
   await loadCurrentConfig();
