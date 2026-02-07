@@ -39,7 +39,8 @@ async function getConfig() {
   
   // Fallback to direct storage access
   try {
-    const result = await browser.storage.sync.get('config');
+    const storageApi = (typeof chrome !== 'undefined' && chrome.storage) ? chrome.storage : browser.storage;
+    const result = await storageApi.sync.get('config');
     
     if (!result.config) {
       // Return default config
