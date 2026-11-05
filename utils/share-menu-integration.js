@@ -229,7 +229,28 @@ async function initializeShareMenuIntegration(config) {
   async function copyImageToClipboard(menuItem, imageUrl) {
     try {
       // Pass a promise to ClipboardItem so the write keeps the click's user activation
-      const pngPromise = fetch(imageUrl, { credentials: 'omit' })
+      // Firefox content-script fetch runs as the extension, so pbs.twimg.com's
+      // CORS (allows only https://x.com) blocks it. content.fetch runs as the page.
+      const pageFetch = (typeof content !== 'undefined' && content && typeof content.fetch === 'function')
+        ? content.fetch.bind(content)
+        : fetch;
+      if (pageFetch !== fetch && typeof browser !== 'undefined' && browser.runtime) {
+        // Firefox: send the bytes to the background script's clipboard API
+        const response = await pageFetch(imageUrl, { credentials: 'omit' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const blob = await response.blob();
+        const data = await blob.arrayBuffer();
+        const format = blob.type === 'image/png' ? 'png' : 'jpeg';
+        const result = await browser.runtime.sendMessage({ action: 'copyImage', data, format });
+        if (!result || !result.success) {
+          throw new Error((result && result.error) || 'Background copy failed');
+        }
+        window.FeedbackManager.showSuccessFeedback(menuItem, platform);
+        window.FeedbackManager.hideFeedbackAfterDelay(menuItem, 2000);
+        return;
+      }
+
+      const pngPromise = pageFetch(imageUrl, { credentials: 'omit' })
         .then((response) => {
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
           return response.blob();

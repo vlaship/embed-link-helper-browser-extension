@@ -6,6 +6,7 @@
   "permissions": [
     "storage",
     "activeTab",
+    "clipboardWrite",
     "*://x.com/*",
     "*://www.instagram.com/*"
   ],
