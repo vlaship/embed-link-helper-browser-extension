@@ -161,6 +161,17 @@ npm run build:all
 
 The build scripts create clean packages ready for distribution or loading in the browser.
 
+#### Releasing
+
+Push a version tag on `main` (`1.2.3` or `v1.2.3`):
+
+```bash
+git tag 1.2.3
+git push origin 1.2.3
+```
+
+The [Release workflow](.github/workflows/release.yml) runs the tests, builds the Chrome and Firefox zips with the tag's version, attaches them to a GitHub Release, and commits that version to `package.json`, `package-lock.json` and the manifests on `main`.
+
 ### Technology Stack
 - Manifest V3 (Chrome) / V2 (Firefox)
 - WebExtensions API for cross-browser support
