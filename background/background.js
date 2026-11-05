@@ -187,6 +187,23 @@ browser.runtime.onInstalled.addListener(async (details) => {
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   console.log('Received message:', message.action);
 
+  // Handle copyImage action (Firefox: content scripts can't hand ClipboardItem
+  // objects to the page clipboard, so the image bytes are written from here)
+  if (message.action === 'copyImage') {
+    if (!browser.clipboard || typeof browser.clipboard.setImageData !== 'function') {
+      sendResponse({ success: false, error: 'clipboard.setImageData not available' });
+      return false;
+    }
+    const format = message.format === 'png' ? 'png' : 'jpeg';
+    browser.clipboard.setImageData(message.data, format)
+      .then(() => sendResponse({ success: true }))
+      .catch(error => {
+        console.error('Error handling copyImage:', error);
+        sendResponse({ success: false, error: error.message });
+      });
+    return true;
+  }
+
   // Handle getConfig action
   if (message.action === 'getConfig') {
     getStoredConfig()
