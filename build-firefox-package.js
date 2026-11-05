@@ -12,14 +12,25 @@ const { execSync } = require('child_process');
 
 console.log('Building Firefox extension package...\n');
 
-// Increment patch version
+// Resolve the build version:
+// - BUILD_VERSION env (e.g. from a git tag in CI) is used as-is
+// - otherwise the patch version is incremented (local release builds)
 function incrementVersion() {
   const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-  const version = packageJson.version.split('.');
-  version[2] = parseInt(version[2]) + 1;
-  const newVersion = version.join('.');
-  
-  console.log(`Incrementing version: ${packageJson.version} → ${newVersion}\n`);
+  let newVersion;
+  if (process.env.BUILD_VERSION) {
+    newVersion = process.env.BUILD_VERSION.replace(/^v/, '');
+    if (!/^\d+\.\d+\.\d+$/.test(newVersion)) {
+      console.error(`✗ Invalid BUILD_VERSION "${process.env.BUILD_VERSION}", expected X.Y.Z`);
+      process.exit(1);
+    }
+    console.log(`Using version from BUILD_VERSION: ${newVersion}\n`);
+  } else {
+    const version = packageJson.version.split('.');
+    version[2] = parseInt(version[2]) + 1;
+    newVersion = version.join('.');
+    console.log(`Incrementing version: ${packageJson.version} → ${newVersion}\n`);
+  }
   
   // Update all manifest files
   packageJson.version = newVersion;
@@ -142,14 +153,20 @@ try {
     const originalDir = process.cwd();
     process.chdir(distDir);
     
-    // Use PowerShell with full path
-    const command = `powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Compress-Archive -Path * -DestinationPath '${path.join(originalDir, zipFileName)}' -Force"`;
-    execSync(command);
+    const zipTarget = path.join(originalDir, zipFileName);
+    const command = process.platform === 'win32'
+      ? `powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Compress-Archive -Path * -DestinationPath '${zipTarget}' -Force"`
+      : `zip -r -q "${zipTarget}" .`;
+    execSync(command, { stdio: 'inherit' });
     
     process.chdir(originalDir);
     console.log(`✓ Created ${zipFileName}`);
     console.log(`\nPackage ready for upload: ${zipPath}`);
   } catch (zipError) {
+    if (process.env.CI) {
+      console.error(`✗ Could not create zip: ${zipError.message}`);
+      process.exit(1);
+    }
     console.log(`⚠ Could not create zip automatically: ${zipError.message}`);
     console.log('\nTo create a .zip file manually:');
     console.log(`  cd ${distDir}`);
