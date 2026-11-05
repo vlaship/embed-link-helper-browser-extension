@@ -18,12 +18,12 @@ jobs:
       BUILD_VERSION: ${{ github.ref_name }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - name: Install dependencies
@@ -57,7 +57,7 @@ jobs:
           mv embed-link-helper-chrome.zip "embed-link-helper-chrome-${version}.zip"
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: embed-link-helper-${{ github.ref_name }}
           path: embed-link-helper-*.zip
@@ -69,3 +69,60 @@ jobs:
           gh release create "$GITHUB_REF_NAME" embed-link-helper-*.zip \
             --title "$GITHUB_REF_NAME" \
             --generate-notes
+
+  # After a successful build, write the tag's version back to main so the
+  # repository matches the released packages.
+  update-version:
+    needs: build
+    runs-on: ubuntu-latest
+    env:
+      BUILD_VERSION: ${{ github.ref_name }}
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Check tag is on main
+        id: guard
+        run: |
+          if git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "on_main=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Tag $GITHUB_REF_NAME is not on main; skipping version update"
+            echo "on_main=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Node.js
+        if: steps.guard.outputs.on_main == 'true'
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Set version from tag
+        if: steps.guard.outputs.on_main == 'true'
+        run: |
+          version="${BUILD_VERSION#v}"
+          npm version "$version" --no-git-tag-version --allow-same-version
+          VERSION="$version" node -e '
+            const fs = require("fs");
+            for (const f of ["manifest.json", "manifest-chrome.json", "manifest-firefox.json"]) {
+              const j = JSON.parse(fs.readFileSync(f, "utf8"));
+              j.version = process.env.VERSION;
+              fs.writeFileSync(f, JSON.stringify(j, null, 2) + "\n");
+            }
+          '
+          git diff --stat
+
+      - name: Commit and push to main
+        if: steps.guard.outputs.on_main == 'true'
+        run: |
+          if git diff --quiet; then
+            echo "main already has version ${BUILD_VERSION#v}"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "chore: set version to ${BUILD_VERSION#v} [skip ci]"
+          git push origin HEAD:main
