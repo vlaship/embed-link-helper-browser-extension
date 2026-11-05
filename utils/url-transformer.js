@@ -148,27 +148,52 @@ function shouldInjectButton(urlString) {
   return isTwitterUrl(urlString) || isInstagramUrl(urlString);
 }
 
+/**
+ * Convert a Twitter/X media image URL to its full-resolution form
+ * e.g. https://pbs.twimg.com/media/ABC?format=jpg&name=small
+ *   -> https://pbs.twimg.com/media/ABC?format=jpg&name=orig
+ * @param {string} src - Image src
+ * @returns {string|null} Direct original image URL, or null if not a Twitter media image
+ */
+function getOriginalImageUrl(src) {
+  if (!src || typeof src !== 'string') {
+    return null;
+  }
+  try {
+    const url = new URL(src);
+    if (url.hostname !== 'pbs.twimg.com' || !url.pathname.startsWith('/media/')) {
+      return null;
+    }
+    // Legacy form: /media/ABC.jpg:large
+    const legacy = url.pathname.match(/^(\/media\/[^.:]+)\.(\w+)(?::\w+)?$/);
+    if (legacy) {
+      url.pathname = legacy[1];
+      url.searchParams.set('format', legacy[2]);
+    }
+    url.searchParams.set('name', 'orig');
+    return url.toString();
+  } catch (error) {
+    return null;
+  }
+}
+
+const UrlTransformerApi = {
+  validateHostname,
+  parseUrl,
+  transformUrl,
+  isTwitterUrl,
+  isInstagramUrl,
+  shouldInjectButton,
+  getOriginalImageUrl
+};
+
 // Export functions for use in other modules
 if (typeof module !== 'undefined' && module.exports) {
   // Node.js/CommonJS environment (for testing)
-  module.exports = {
-    validateHostname,
-    parseUrl,
-    transformUrl,
-    isTwitterUrl,
-    isInstagramUrl,
-    shouldInjectButton
-  };
+  module.exports = UrlTransformerApi;
 }
 
 // Expose to window for browser extension content scripts
 if (typeof window !== 'undefined') {
-  window.UrlTransformer = {
-    validateHostname,
-    parseUrl,
-    transformUrl,
-    isTwitterUrl,
-    isInstagramUrl,
-    shouldInjectButton
-  };
+  window.UrlTransformer = UrlTransformerApi;
 }

@@ -496,3 +496,27 @@ describe('Share Menu Integration', () => {
     });
   });
 });
+
+describe('getInstagramPostUrlFromLocation', () => {
+  const { getInstagramPostUrlFromLocation } = require('./share-menu-integration');
+  const loc = (href) => new URL(href);
+
+  test.each([
+    ['https://www.instagram.com/reel/DfUmYFDoEBx/?utm_source=ig_web_copy_link', 'https://www.instagram.com/reel/DfUmYFDoEBx/'],
+    ['https://www.instagram.com/reels/DfUmYFDoEBx/', 'https://www.instagram.com/reel/DfUmYFDoEBx/'],
+    ['https://www.instagram.com/p/De_hXbek43_/', 'https://www.instagram.com/p/De_hXbek43_/'],
+    ['https://www.instagram.com/someuser/p/De_hXbek43_/', 'https://www.instagram.com/p/De_hXbek43_/'],
+    ['https://www.instagram.com/tv/ABC123/', 'https://www.instagram.com/tv/ABC123/']
+  ])('%s -> %s', (href, expected) => {
+    expect(getInstagramPostUrlFromLocation(loc(href))).toBe(expected);
+  });
+
+  test.each([
+    'https://www.instagram.com/',
+    'https://www.instagram.com/someuser/',
+    'https://www.instagram.com/explore/',
+    'https://example.com/p/ABC123/'
+  ])('returns null for %s', (href) => {
+    expect(getInstagramPostUrlFromLocation(loc(href))).toBeNull();
+  });
+});

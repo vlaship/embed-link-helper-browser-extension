@@ -464,3 +464,29 @@ describe('URL Transformer', () => {
     });
   });
 });
+
+describe('getOriginalImageUrl', () => {
+  const { getOriginalImageUrl } = require('./url-transformer');
+
+  test('upgrades name param to orig', () => {
+    expect(getOriginalImageUrl('https://pbs.twimg.com/media/ABC123?format=jpg&name=small'))
+      .toBe('https://pbs.twimg.com/media/ABC123?format=jpg&name=orig');
+  });
+
+  test('adds name=orig when missing', () => {
+    expect(getOriginalImageUrl('https://pbs.twimg.com/media/ABC123?format=png'))
+      .toBe('https://pbs.twimg.com/media/ABC123?format=png&name=orig');
+  });
+
+  test('converts legacy extension form', () => {
+    expect(getOriginalImageUrl('https://pbs.twimg.com/media/ABC123.jpg:large'))
+      .toBe('https://pbs.twimg.com/media/ABC123?format=jpg&name=orig');
+  });
+
+  test('rejects non-media URLs', () => {
+    expect(getOriginalImageUrl('https://pbs.twimg.com/profile_images/1/a.jpg')).toBeNull();
+    expect(getOriginalImageUrl('https://example.com/media/ABC')).toBeNull();
+    expect(getOriginalImageUrl('not a url')).toBeNull();
+    expect(getOriginalImageUrl(null)).toBeNull();
+  });
+});

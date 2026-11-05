@@ -62,6 +62,35 @@ const SHARE_MENU_SELECTORS = {
 let lastClickedShareButton = null;
 let lastClickTime = 0;
 
+// Track the last right-clicked tweet photo (for the image context menu)
+let lastContextImage = null;
+let lastContextTime = 0;
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('contextmenu', (event) => {
+    const target = event.target;
+    const photo = target && target.closest ? target.closest('[data-testid="tweetPhoto"]') : null;
+    const img = photo ? photo.querySelector('img') : null;
+    if (img && img.src) {
+      lastContextImage = img;
+      lastContextTime = Date.now();
+    } else {
+      lastContextImage = null;
+    }
+  }, true);
+}
+
+/**
+ * Get the tweet photo that was right-clicked within the last 2 seconds
+ * @returns {HTMLImageElement|null}
+ */
+function getRecentContextImage() {
+  if (lastContextImage && Date.now() - lastContextTime < 2000) {
+    return lastContextImage;
+  }
+  return null;
+}
+
 /**
  * Detect share menu appearance using MutationObserver
  * @param {string} platform - 'twitter' or 'instagram'
@@ -401,6 +430,7 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     observeShareMenus,
     findAssociatedPost,
+    getRecentContextImage,
     isShareMenu,
     getSelectorConfig,
     SHARE_MENU_SELECTORS
@@ -412,6 +442,7 @@ if (typeof window !== 'undefined') {
   window.ShareMenuDetector = {
     observeShareMenus,
     findAssociatedPost,
+    getRecentContextImage,
     isShareMenu,
     getSelectorConfig,
     SHARE_MENU_SELECTORS

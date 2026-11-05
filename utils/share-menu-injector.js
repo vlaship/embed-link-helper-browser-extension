@@ -8,9 +8,11 @@
  * @param {string} postUrl - The post URL to transform
  * @param {string} targetHostname - Target hostname for transformation
  * @param {string} platform - 'twitter' or 'instagram'
+ * @param {string} [label] - Menu item text
+ * @param {boolean} [showIcon] - Whether to render the link icon (Twitter only)
  * @returns {HTMLElement|null} The created menu item element
  */
-function createEmbedLinkMenuItem(postUrl, targetHostname, platform) {
+function createEmbedLinkMenuItem(postUrl, targetHostname, platform, label = 'Copy embed link', showIcon = true) {
   if (!postUrl || typeof postUrl !== 'string') {
     console.error('[share-menu-injector] Invalid post URL provided');
     return null;
@@ -64,14 +66,16 @@ function createEmbedLinkMenuItem(postUrl, targetHostname, platform) {
       svg.appendChild(path2);
       
       iconContainer.appendChild(svg);
-      innerDiv.appendChild(iconContainer);
+      if (showIcon) innerDiv.appendChild(iconContainer);
       
       // Create text container
       const textContainer = document.createElement('div');
       textContainer.style.cssText = 'flex: 1;';
       
       const textSpan = document.createElement('span');
-      textSpan.textContent = 'Copy embed link';
+      textSpan.textContent = label;
+      // Match X's native menu item typography (bold 15px Chirp)
+      textSpan.style.cssText = 'font-family: TwitterChirp, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size: 15px; line-height: 20px; font-weight: 700; overflow-wrap: break-word;';
       textContainer.appendChild(textSpan);
       
       innerDiv.appendChild(textContainer);
@@ -95,7 +99,7 @@ function createEmbedLinkMenuItem(postUrl, targetHostname, platform) {
       
       // Create SVG icon
       const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-      svg.setAttribute('aria-label', 'Copy embed link');
+      svg.setAttribute('aria-label', label);
       svg.setAttribute('fill', 'currentColor');
       svg.setAttribute('height', '20');
       svg.setAttribute('width', '20');
@@ -119,7 +123,7 @@ function createEmbedLinkMenuItem(postUrl, targetHostname, platform) {
       textContainer.style.cssText = 'margin-top: 8px;';
       
       const textSpan = document.createElement('span');
-      textSpan.textContent = 'Copy embed link';
+      textSpan.textContent = label;
       textSpan.style.cssText = 'font-size: 12px; line-height: 16px; text-align: center; display: block; max-width: 76px; overflow: hidden; text-overflow: ellipsis;';
       textSpan.classList.add('x1lliihq', 'x1plvlek', 'xryxfnj', 'x1n2onr6', 'xyejjpt', 'x15dsfln', 'x193iq5w', 'xeuugli', 'x1fj9vlw', 'x13faqbe', 'x1vvkbs', 'x1s928wv', 'xhkezso', 'x1gmr53x', 'x1cpjm7i', 'x1fgarty', 'x1943h6x', 'x1i0vuye', 'x1fhwpqd', 'xo1l8bm', 'x5n08af', 'x2b8uid', 'x1s3etm8', 'x676frb', 'x10wh9bi', 'xpm28yp', 'x8viiok', 'x1o7cslx');
       
@@ -203,6 +207,7 @@ function injectMenuItem(menuItem, menuContainer, platform) {
         // Fallback: insert at the beginning if Copy link not found
         injectionPoint.insertBefore(menuItem, injectionPoint.firstChild);
       }
+      matchTwitterTextColor(menuItem, injectionPoint);
     } else if (platform === 'instagram') {
       // For Instagram, insert after "Copy link" button
       const copyLinkButton = findCopyLinkButton(injectionPoint, platform);
@@ -212,6 +217,7 @@ function injectMenuItem(menuItem, menuContainer, platform) {
         // Fallback: insert at the beginning if Copy link not found
         injectionPoint.insertBefore(menuItem, injectionPoint.firstChild);
       }
+      matchInstagramListRow(menuItem, injectionPoint);
     }
 
     // Verify injection
@@ -232,6 +238,60 @@ function injectMenuItem(menuItem, menuContainer, platform) {
   } catch (error) {
     console.error('[share-menu-injector] Error injecting menu item:', error);
     return false;
+  }
+}
+
+/**
+ * Copy the text color of a native X menu item so the injected item matches
+ * the current theme (light / dim / lights out).
+ * @param {HTMLElement} menuItem - The injected menu item
+ * @param {HTMLElement} container - Container holding native menu items
+ */
+function matchTwitterTextColor(menuItem, container) {
+  try {
+    const native = Array.from(container.querySelectorAll('[role="menuitem"]'))
+      .find(el => !el.classList.contains('embed-link-menu-item'));
+    const source = native && (native.querySelector('span') || native);
+    const color = source && window.getComputedStyle(source).color;
+    menuItem.style.color = color || 'rgb(15, 20, 25)';
+  } catch (error) {
+    menuItem.style.color = 'rgb(15, 20, 25)';
+  }
+}
+
+/**
+ * In Instagram's list-style "..." menu (full-width text rows, no icons),
+ * rebuild the injected item as a copy of the native "Copy link" row so it
+ * matches exactly. The circular share-sheet layout is left untouched.
+ * @param {HTMLElement} menuItem - The injected menu item
+ * @param {HTMLElement} container - Container holding the native rows
+ */
+function matchInstagramListRow(menuItem, container) {
+  try {
+    const row = Array.from(container.children).find(child =>
+      child !== menuItem && (child.textContent || '').trim().toLowerCase() === 'copy link'
+    );
+    // Share-sheet tiles are ~76px wide; list rows span the menu
+    if (!row || row.getBoundingClientRect().width < 150) {
+      return;
+    }
+
+    const label = menuItem.textContent.trim() || 'Copy embed link';
+    const clone = row.cloneNode(true);
+    const walker = document.createTreeWalker(clone, NodeFilter.SHOW_TEXT);
+    let textNode;
+    while ((textNode = walker.nextNode())) {
+      if (textNode.nodeValue.trim().toLowerCase() === 'copy link') {
+        textNode.nodeValue = label;
+        break;
+      }
+    }
+
+    menuItem.replaceChildren(...clone.childNodes);
+    menuItem.className = `${row.className} embed-link-menu-item`.trim();
+    menuItem.style.cssText = 'cursor: pointer;';
+  } catch (error) {
+    window.Logger.warn('[share-menu-injector] Could not match Instagram list row', error);
   }
 }
 

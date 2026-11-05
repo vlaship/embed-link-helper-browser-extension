@@ -21,6 +21,24 @@ function getMenuIdentifier(menuElement) {
 }
 
 /**
+ * Get the Instagram post URL from the page location when it points at a post
+ * e.g. /reel/ID/, /reels/ID/, /p/ID/, /tv/ID/, /username/p/ID/
+ * @param {Location|URL} location - Page location
+ * @returns {string|null} Canonical post URL (https://www.instagram.com/<type>/<id>/) or null
+ */
+function getInstagramPostUrlFromLocation(location) {
+  if (!location || !/(^|\.)instagram\.com$/.test(location.hostname || '')) {
+    return null;
+  }
+  const match = (location.pathname || '').match(/\/(p|reels?|tv)\/([A-Za-z0-9_-]+)/);
+  if (!match) {
+    return null;
+  }
+  const type = match[1] === 'reels' ? 'reel' : match[1];
+  return `https://www.instagram.com/${type}/${match[2]}/`;
+}
+
+/**
  * Initialize share menu integration for a platform
  * @param {Object} config - Platform configuration
  * @param {string} config.platform - Platform name ('twitter' or 'instagram')
@@ -84,15 +102,57 @@ async function initializeShareMenuIntegration(config) {
         return;
       }
       
-      // Find the associated post
-      const postElement = window.ShareMenuDetector.findAssociatedPost(menuElement, platform);
-      if (!postElement) {
-        window.Logger.warn(`[${platform}-share-menu] Could not find associated post`);
-        return;
+      // Photo context menu (right-click on a tweet image): offer direct image link
+      if (platform === 'twitter' && window.ShareMenuDetector.getRecentContextImage) {
+        const contextImage = window.ShareMenuDetector.getRecentContextImage();
+        const imageUrl = contextImage && window.UrlTransformer.getOriginalImageUrl(contextImage.src);
+        if (imageUrl) {
+          const makeItem = (label, onActivate) => {
+            const item = window.ShareMenuInjector.createEmbedLinkMenuItem(
+              imageUrl,
+              currentConfig[platformKey].targetHostname,
+              platform,
+              label,
+              false
+            );
+            if (!item) return null;
+            item.addEventListener('click', (event) => onActivate(event.currentTarget));
+            item.addEventListener('keydown', (event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                onActivate(event.currentTarget);
+              }
+            });
+            return item;
+          };
+
+          const copyImageItem = makeItem('Copy image', (item) => copyImageToClipboard(item, imageUrl));
+          const copyLinkItem = makeItem('Copy image link', (item) => copyDirectUrl(item, imageUrl));
+
+          if (copyImageItem && window.ShareMenuInjector.injectMenuItem(copyImageItem, menuElement, platform)) {
+            if (copyLinkItem) {
+              copyImageItem.parentNode.insertBefore(copyLinkItem, copyImageItem.nextSibling);
+            }
+          }
+          return;
+        }
       }
-      
-      // Extract post URL
-      const postUrl = window.PostUrlExtractor.extractPostUrl(postElement, platform);
+
+      // On an Instagram post/reel page (or post modal) the address bar names the
+      // open post; DOM-based detection can pick a neighbouring post instead.
+      let postUrl = platform === 'instagram' ? getInstagramPostUrlFromLocation(window.location) : null;
+
+      if (!postUrl) {
+        // Find the associated post
+        const postElement = window.ShareMenuDetector.findAssociatedPost(menuElement, platform);
+        if (!postElement) {
+          window.Logger.warn(`[${platform}-share-menu] Could not find associated post`);
+          return;
+        }
+
+        // Extract post URL
+        postUrl = window.PostUrlExtractor.extractPostUrl(postElement, platform);
+      }
       if (!postUrl) {
         window.Logger.warn(`[${platform}-share-menu] Could not extract post URL`);
         return;
@@ -141,6 +201,67 @@ async function initializeShareMenuIntegration(config) {
     }
   }
   
+  /**
+   * Copy a URL as-is (no transformation) and show feedback
+   * @param {HTMLElement} menuItem - The clicked menu item
+   * @param {string} url - URL to copy
+   */
+  async function copyDirectUrl(menuItem, url) {
+    try {
+      const success = await window.ClipboardManager.copyToClipboard(url);
+      if (success) {
+        window.FeedbackManager.showSuccessFeedback(menuItem, platform);
+      } else {
+        window.FeedbackManager.showErrorFeedback(menuItem, 'Copy failed', platform);
+      }
+    } catch (error) {
+      console.error(`[${platform}-share-menu] Error copying direct URL:`, error);
+      window.FeedbackManager.showErrorFeedback(menuItem, 'Error', platform);
+    }
+    window.FeedbackManager.hideFeedbackAfterDelay(menuItem, 2000);
+  }
+
+  /**
+   * Copy the image itself (as PNG) to the clipboard and show feedback
+   * @param {HTMLElement} menuItem - The clicked menu item
+   * @param {string} imageUrl - Image URL to fetch
+   */
+  async function copyImageToClipboard(menuItem, imageUrl) {
+    try {
+      // Pass a promise to ClipboardItem so the write keeps the click's user activation
+      const pngPromise = fetch(imageUrl, { credentials: 'omit' })
+        .then((response) => {
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          return response.blob();
+        })
+        .then((blob) => convertToPng(blob));
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngPromise })]);
+      window.FeedbackManager.showSuccessFeedback(menuItem, platform);
+    } catch (error) {
+      console.error(`[${platform}-share-menu] Error copying image:`, error);
+      window.FeedbackManager.showErrorFeedback(menuItem, 'Copy failed', platform);
+    }
+    window.FeedbackManager.hideFeedbackAfterDelay(menuItem, 2000);
+  }
+
+  /**
+   * Convert an image blob to PNG (the only image type clipboards accept reliably)
+   * @param {Blob} blob - Source image blob
+   * @returns {Promise<Blob>} PNG blob
+   */
+  async function convertToPng(blob) {
+    if (blob.type === 'image/png') return blob;
+    const bitmap = await createImageBitmap(blob);
+    const canvas = document.createElement('canvas');
+    canvas.width = bitmap.width;
+    canvas.height = bitmap.height;
+    canvas.getContext('2d').drawImage(bitmap, 0, 0);
+    bitmap.close();
+    return new Promise((resolve, reject) => {
+      canvas.toBlob((png) => (png ? resolve(png) : reject(new Error('PNG conversion failed'))), 'image/png');
+    });
+  }
+
   /**
    * Handle menu item click
    * @param {Event} event - The click event
@@ -298,7 +419,8 @@ async function initializeShareMenuIntegration(config) {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     initializeShareMenuIntegration,
-    getMenuIdentifier
+    getMenuIdentifier,
+    getInstagramPostUrlFromLocation
   };
 }
 
@@ -306,6 +428,7 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
   window.ShareMenuIntegration = {
     initializeShareMenuIntegration,
-    getMenuIdentifier
+    getMenuIdentifier,
+    getInstagramPostUrlFromLocation
   };
 }
